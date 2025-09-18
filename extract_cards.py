@@ -382,6 +382,11 @@ def generate_html_report(tcg_cards, cm_cards):
     </table>
     
     <script>
+    // Apply filters on page load
+    window.onload = function() {
+        filterTable();
+    };
+
     function filterTable() {
         var setFilter = document.getElementById("setFilter").value;
         var statusFilter = document.getElementById("statusFilter").value;
