@@ -6,7 +6,34 @@ Extracts card data from TCG Collector and Cardmarket HTML files
 
 import re
 import html
+import requests
+import time
 from pathlib import Path
+
+def fetch_card_image_url(card_id):
+    """Fetch the image URL for a specific card ID from TCG Collector"""
+    try:
+        # Construct the card detail page URL (we don't need the slug, just the ID works)
+        url = f"https://www.tcgcollector.com/cards/{card_id}/"
+
+        # Add a small delay to be respectful to the server
+        time.sleep(0.1)
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            # Look for the main card image URL in the HTML content - handle multiple formats
+            image_pattern = r'https://static\.tcgcollector\.com/content/images/[a-f0-9/]+\.(jpg|webp|png)'
+            image_match = re.search(image_pattern, response.text)
+            if image_match:
+                return image_match.group(0)
+    except Exception as e:
+        print(f"Error fetching image for card {card_id}: {e}")
+
+    return None
 
 def extract_tcg_collector_cards(html_content):
     """Extract card data from TCG Collector HTML"""
@@ -96,6 +123,7 @@ def extract_tcg_collector_cards(html_content):
         
         if card_id_match:
             card_id = card_id_match.group(1)
+            card['card_id'] = card_id  # Store card ID for image fetching
             # Look for indicators for this specific card
             indicator_pattern = rf'data-card-id="{card_id}".*?card-collection-card-controls-indicators.*?</button>'
             indicator_match = re.search(indicator_pattern, html_content, re.DOTALL | re.IGNORECASE)
@@ -271,6 +299,31 @@ def generate_html_report(tcg_cards, cm_cards):
         .missing-card {{ background-color: #f8d7da; }}
         .pending {{ background-color: #fff3cd; }}
         .stats {{ margin-bottom: 20px; font-size: 18px; }}
+        .camera-icon {{
+            cursor: pointer;
+            color: #007bff;
+            margin-left: 5px;
+            font-size: 14px;
+            position: relative;
+        }}
+        .camera-icon:hover {{ color: #0056b3; }}
+        .card-preview {{
+            position: absolute;
+            z-index: 1000;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 5px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            max-width: 200px;
+            display: none;
+            pointer-events: auto;
+        }}
+        .card-preview img {{
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }}
     </style>
 </head>
 <body>
@@ -310,14 +363,15 @@ def generate_html_report(tcg_cards, cm_cards):
     <table id="cardTable">
         <thead>
             <tr>
-                <th onclick="sortTable(0)">Set Name</th>
-                <th onclick="sortTable(1)">Set Code</th>
-                <th onclick="sortTable(2)">Card Number</th>
-                <th onclick="sortTable(3)">Total</th>
-                <th onclick="sortTable(4)">Card Name</th>
-                <th onclick="sortTable(5)">Variant</th>
-                <th onclick="sortTable(6)">Have</th>
-                <th onclick="sortTable(7)">Status</th>
+                <th>Preview</th>
+                <th onclick="sortTable(1)">Set Name</th>
+                <th onclick="sortTable(2)">Set Code</th>
+                <th onclick="sortTable(3)">Card Number</th>
+                <th onclick="sortTable(4)">Total</th>
+                <th onclick="sortTable(5)">Card Name</th>
+                <th onclick="sortTable(6)">Variant</th>
+                <th onclick="sortTable(7)">Have</th>
+                <th onclick="sortTable(8)">Status</th>
             </tr>
         </thead>
         <tbody>
@@ -343,7 +397,14 @@ def generate_html_report(tcg_cards, cm_cards):
         total_count = card.get('total_count', '')  # Use total count if available
         name = card.get('name', 'Unknown')
         variant = card.get('variant_type', 'Normal')
-        
+        card_id = card.get('card_id')
+
+        # Create camera icon HTML if card has an ID
+        camera_icon_html = ''
+        if card_id:
+            camera_icon_html = f'<span class="camera-icon" onmouseover="showCardPreview(event, \'{card_id}\')" onmouseout="hideCardPreview()">📷</span>'
+
+
         have = '✓' if card.get('has_card') else '✗'
         
         # Determine status
@@ -367,6 +428,7 @@ def generate_html_report(tcg_cards, cm_cards):
         
         html_content += f"""
             <tr class="{row_class}">
+                <td style="text-align: center;">{camera_icon_html}</td>
                 <td>{html.escape(set_name)}</td>
                 <td>{html.escape(set_code)}</td>
                 <td>{html.escape(number)}</td>
@@ -397,9 +459,9 @@ def generate_html_report(tcg_cards, cm_cards):
         for (var i = 1; i < rows.length; i++) {
             var row = rows[i];
             var cells = row.getElementsByTagName("td");
-            var setName = cells[0].textContent;
-            var cardName = cells[4].textContent.toLowerCase();
-            var status = cells[7].textContent;
+            var setName = cells[1].textContent;
+            var cardName = cells[5].textContent.toLowerCase();
+            var status = cells[8].textContent;
             
             var showRow = true;
             
@@ -432,7 +494,7 @@ def generate_html_report(tcg_cards, cm_cards):
             var bValue = b.getElementsByTagName("td")[columnIndex].textContent;
             
             // Try to parse as numbers for numeric columns
-            if (columnIndex === 2) { // Card Number column
+            if (columnIndex === 3) { // Card Number column
                 var aNum = parseInt(aValue);
                 var bNum = parseInt(bValue);
                 if (!isNaN(aNum) && !isNaN(bNum)) {
@@ -447,6 +509,104 @@ def generate_html_report(tcg_cards, cm_cards):
             tbody.appendChild(row);
         });
     }
+
+    let cardPreviewElement = null;
+    let cardImageCache = {};
+    let hideTimeout = null;
+
+    async function showCardPreview(event, cardId) {
+        // Clear any pending hide timeout
+        if (hideTimeout) {
+            clearTimeout(hideTimeout);
+            hideTimeout = null;
+        }
+        if (!cardId) return;
+
+        // Create preview element if it doesn't exist
+        if (!cardPreviewElement) {
+            cardPreviewElement = document.createElement('div');
+            cardPreviewElement.className = 'card-preview';
+
+            // Add hover events to keep popup visible when hovering over it
+            cardPreviewElement.addEventListener('mouseenter', function() {
+                if (hideTimeout) {
+                    clearTimeout(hideTimeout);
+                    hideTimeout = null;
+                }
+            });
+
+            cardPreviewElement.addEventListener('mouseleave', function() {
+                hideCardPreview();
+            });
+
+            document.body.appendChild(cardPreviewElement);
+        }
+
+        // Position the preview near the mouse cursor
+        const rect = event.target.getBoundingClientRect();
+        cardPreviewElement.style.left = (rect.right + 10) + 'px';
+        cardPreviewElement.style.top = rect.top + 'px';
+
+        // Check if we have the image URL cached
+        if (cardImageCache[cardId]) {
+            if (cardImageCache[cardId] !== 'failed') {
+                cardPreviewElement.innerHTML = `<img src="${cardImageCache[cardId]}" alt="Card preview" />`;
+                cardPreviewElement.style.display = 'block';
+            }
+            return;
+        }
+
+        // Show loading message
+        cardPreviewElement.innerHTML = '<div style="padding: 10px;">Loading...</div>';
+        cardPreviewElement.style.display = 'block';
+
+        try {
+            // Try to fetch the card detail page to get the actual image URL
+            // Note: This will likely fail due to CORS, but we'll provide a fallback
+            fetch(`https://www.tcgcollector.com/cards/${cardId}/`)
+                .then(response => response.text())
+                .then(html => {
+                    // Extract the image URL from the HTML - handle multiple formats
+                    const imageMatch = html.match(/https:\/\/static\.tcgcollector\.com\/content\/images\/[a-f0-9\/]+\.(jpg|webp|png)/);
+                    if (imageMatch) {
+                        const imageUrl = imageMatch[0];
+                        cardImageCache[cardId] = imageUrl;
+                        if (cardPreviewElement.style.display === 'block') {
+                            cardPreviewElement.innerHTML = `<img src="${imageUrl}" alt="Card preview" />`;
+                        }
+                    } else {
+                        throw new Error('Image URL not found');
+                    }
+                })
+                .catch(error => {
+                    // CORS fallback: Show card link instead of image
+                    console.log('CORS prevented image fetch, showing link instead:', error);
+                    cardImageCache[cardId] = 'link';
+                    if (cardPreviewElement.style.display === 'block') {
+                        cardPreviewElement.innerHTML = `
+                            <div style="padding: 10px; text-align: center;">
+                                <p>🔗 <a href="https://www.tcgcollector.com/cards/${cardId}/" target="_blank" style="color: #007bff;">View card on TCG Collector</a></p>
+                                <small>Image preview blocked by CORS</small>
+                            </div>
+                        `;
+                    }
+                });
+
+        } catch (error) {
+            console.log('Error loading card preview:', error);
+            cardPreviewElement.style.display = 'none';
+            cardImageCache[cardId] = 'failed';
+        }
+    }
+
+    function hideCardPreview() {
+        // Use a small delay to allow moving mouse to the preview popup
+        hideTimeout = setTimeout(function() {
+            if (cardPreviewElement) {
+                cardPreviewElement.style.display = 'none';
+            }
+        }, 100);
+    }
     </script>
 </body>
 </html>"""
@@ -459,6 +619,9 @@ def main():
     if not data_dir.exists():
         print("Error: data/ folder not found. Please create it and add your HTML files.")
         return
+
+    # Option to fetch card images (disabled by default due to time constraints)
+    fetch_images = False  # Set to True to fetch actual image URLs
     
     # Find all TCG Collector HTML files
     tcg_files = list(data_dir.glob("*TCG Collector*.html"))
