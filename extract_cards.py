@@ -310,14 +310,14 @@ def generate_html_report(tcg_cards, cm_cards):
     <table id="cardTable">
         <thead>
             <tr>
-                <th>Set Name</th>
-                <th>Set Code</th>
-                <th>Card Number</th>
-                <th>Total</th>
-                <th>Card Name</th>
-                <th>Variant</th>
-                <th>Have</th>
-                <th>Status</th>
+                <th onclick="sortTable(0)">Set Name</th>
+                <th onclick="sortTable(1)">Set Code</th>
+                <th onclick="sortTable(2)">Card Number</th>
+                <th onclick="sortTable(3)">Total</th>
+                <th onclick="sortTable(4)">Card Name</th>
+                <th onclick="sortTable(5)">Variant</th>
+                <th onclick="sortTable(6)">Have</th>
+                <th onclick="sortTable(7)">Status</th>
             </tr>
         </thead>
         <tbody>
