@@ -10,6 +10,26 @@ import requests
 import time
 from pathlib import Path
 
+def extract_set_info_from_tcg_collector(html_content):
+    """Extract set name and code from TCG Collector HTML"""
+    # Primary pattern: Adjacent span elements with specific IDs
+    pattern = r'<span id="card-search-result-title-set-like-name">([^<]+)</span><span id="card-search-result-title-set-code">([^<]+)</span>'
+    match = re.search(pattern, html_content, re.IGNORECASE)
+
+    if match:
+        set_name = html.unescape(match.group(1).strip())
+        set_code = html.unescape(match.group(2).strip())
+        return set_name, set_code
+
+    # Fallback: Extract from page title
+    title_pattern = r'<title>([^<]+) card list \(International TCG\) – TCG Collector</title>'
+    title_match = re.search(title_pattern, html_content, re.IGNORECASE)
+    if title_match:
+        set_name = html.unescape(title_match.group(1).strip())
+        return set_name, None
+
+    return None, None
+
 def fetch_card_image_url(card_id):
     """Fetch the image URL for a specific card ID from TCG Collector"""
     try:
@@ -38,7 +58,10 @@ def fetch_card_image_url(card_id):
 def extract_tcg_collector_cards(html_content):
     """Extract card data from TCG Collector HTML"""
     cards = []
-    
+
+    # Extract set information dynamically from the HTML
+    dynamic_set_name, dynamic_set_code = extract_set_info_from_tcg_collector(html_content)
+
     # Look for card name patterns to find individual cards
     # Each card has a unique structure we can target
     name_pattern = r'<a[^>]*href="[^"]*cards/[^"]*"[^>]*title="([^"]*\([^)]*\))"[^>]*class="[^"]*card-list-item-entry-text[^"]*"[^>]*>\s*([^<]+)\s*</a>'
@@ -50,54 +73,39 @@ def extract_tcg_collector_cards(html_content):
             'source': 'tcg_collector'
         }
         
+        # Use dynamically extracted set information as the primary source
+        if dynamic_set_name:
+            card['set_name'] = dynamic_set_name
+        if dynamic_set_code:
+            card['set_code'] = dynamic_set_code
+
         # Extract card number and set info from title
         # Title format: "Bulbasaur (Scarlet & Violet 151 001/165)"
         title_match = re.search(r'\(([^)]+)\s+(\d+/\d+)\)', title)
         if title_match:
-            card['set_name'] = html.unescape(title_match.group(1).strip())
+            # Only use title set name if we don't have dynamic set name
+            if not dynamic_set_name:
+                card['set_name'] = html.unescape(title_match.group(1).strip())
             full_number = title_match.group(2)
             # Store both the normalized number (for matching) and total count (for display)
             card['number'] = full_number.split('/')[0]
             card['total_count'] = full_number.split('/')[1] if '/' in full_number else full_number
         
-        # Look for set code near this card
-        card_context_pattern = rf'<a[^>]*>{re.escape(name)}</a>.*?<span[^>]*card-list-item-expansion-code[^>]*>\s*([^<]+)\s*</span>'
-        code_match = re.search(card_context_pattern, html_content, re.DOTALL | re.IGNORECASE)
-        if code_match:
-            card['set_code'] = html.unescape(code_match.group(1).strip())
-            
-            # Map set codes to standardized set names
-            if card['set_code'] == 'MEW':
-                card['set_name'] = 'Scarlet & Violet 151'
-            elif card['set_code'] == 'TWM':
-                card['set_name'] = 'Twilight Masquerade'
-            elif card['set_code'] == 'M24':
-                card['set_name'] = "McDonald's Dragon Discovery"
-            elif card['set_code'] == 'ASR':
-                card['set_name'] = 'Astral Radiance'
-        else:
-            # Try a broader search for set code without requiring specific proximity to card name
-            general_code_pattern = r'<span[^>]*card-list-item-expansion-code[^>]*>\s*([^<]+)\s*</span>'
-            all_codes = re.findall(general_code_pattern, html_content, re.IGNORECASE)
-            if all_codes:
-                # Use the most common set code found in the file
-                from collections import Counter
-                most_common_code = Counter(all_codes).most_common(1)[0][0].strip()
-                card['set_code'] = html.unescape(most_common_code)
-                
-                # Map set codes to standardized set names
-                if card['set_code'] == 'MEW':
-                    card['set_name'] = 'Scarlet & Violet 151'
-                elif card['set_code'] == 'TWM':
-                    card['set_name'] = 'Twilight Masquerade'
-                elif card['set_code'] == 'M24':
-                    card['set_name'] = "McDonald's Dragon Discovery"
-                elif card['set_code'] == 'ASR':
-                    card['set_name'] = 'Astral Radiance'
-            elif 'Scarlet & Violet 151' in card.get('set_name', ''):
-                # Fallback for MEW if regex doesn't find it
-                card['set_code'] = 'MEW'
-                card['set_name'] = 'Scarlet & Violet 151'
+        # Look for set code near this card (fallback if dynamic extraction didn't work)
+        if not dynamic_set_code:
+            card_context_pattern = rf'<a[^>]*>{re.escape(name)}</a>.*?<span[^>]*card-list-item-expansion-code[^>]*>\s*([^<]+)\s*</span>'
+            code_match = re.search(card_context_pattern, html_content, re.DOTALL | re.IGNORECASE)
+            if code_match:
+                card['set_code'] = html.unescape(code_match.group(1).strip())
+            else:
+                # Try a broader search for set code without requiring specific proximity to card name
+                general_code_pattern = r'<span[^>]*card-list-item-expansion-code[^>]*>\s*([^<]+)\s*</span>'
+                all_codes = re.findall(general_code_pattern, html_content, re.IGNORECASE)
+                if all_codes:
+                    # Use the most common set code found in the file
+                    from collections import Counter
+                    most_common_code = Counter(all_codes).most_common(1)[0][0].strip()
+                    card['set_code'] = html.unescape(most_common_code)
         
         # Look for collection indicators near this card
         # Try to find data-card-id for this specific card using both name and number for uniqueness
@@ -224,18 +232,10 @@ def extract_cardmarket_cards(html_content):
             card['name'] = card_info_match.group(1).strip()
             card['set_code'] = card_info_match.group(2)
             card['number'] = card_info_match.group(3)
-            
-            # Map known set codes to set names
-            if card['set_code'] == 'MEW':
-                card['set_name'] = 'Scarlet & Violet 151'
-            elif card['set_code'] == 'TWM':
-                card['set_name'] = 'Twilight Masquerade'
-            elif card['set_code'] == 'M24':
-                card['set_name'] = "McDonald's Dragon Discovery"
-            elif card['set_code'] == 'ASR':
-                card['set_name'] = 'Astral Radiance'
-            else:
-                card['set_name'] = f"Unknown Set ({card['set_code']})"
+
+            # Set name will be resolved dynamically from TCG Collector data
+            # For now, use a placeholder that will be updated when matching with TCG Collector cards
+            card['set_name'] = f"Unknown Set ({card['set_code']})"
         
         cards.append(card)
         
@@ -753,9 +753,28 @@ def generate_individual_set_page(set_name, set_cards):
 
     return html_content
 
+def build_set_mapping_from_tcg_cards(tcg_cards):
+    """Build a mapping of set codes to set names from TCG Collector cards"""
+    set_mapping = {}
+    for card in tcg_cards:
+        set_code = card.get('set_code')
+        set_name = card.get('set_name')
+        if set_code and set_name:
+            set_mapping[set_code] = set_name
+    return set_mapping
+
 def generate_html_report(tcg_cards, cm_cards):
     """Generate HTML report showing card status"""
-    
+
+    # Build set mapping from TCG Collector data
+    set_mapping = build_set_mapping_from_tcg_cards(tcg_cards)
+
+    # Update Cardmarket cards with proper set names
+    for card in cm_cards:
+        set_code = card.get('set_code')
+        if set_code and set_code in set_mapping:
+            card['set_name'] = set_mapping[set_code]
+
     # Combine all cards by set code and number
     all_cards = {}
     
@@ -1197,6 +1216,15 @@ def main():
     print(f"Legacy report generated: {output_file}")
 
     # Generate new multi-page reports
+
+    # Build set mapping from TCG Collector data
+    set_mapping = build_set_mapping_from_tcg_cards(tcg_cards)
+
+    # Update Cardmarket cards with proper set names
+    for card in cm_cards:
+        set_code = card.get('set_code')
+        if set_code and set_code in set_mapping:
+            card['set_name'] = set_mapping[set_code]
 
     # Combine all cards by set code and number (same logic as before)
     all_cards = {}
