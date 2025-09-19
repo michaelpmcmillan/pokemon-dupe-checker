@@ -80,16 +80,21 @@ def extract_tcg_collector_cards(html_content):
             card['set_code'] = dynamic_set_code
 
         # Extract card number and set info from title
-        # Title format: "Bulbasaur (Scarlet & Violet 151 001/165)"
-        title_match = re.search(r'\(([^)]+)\s+(\d+/\d+)\)', title)
+        # Title format: "Bulbasaur (Scarlet & Violet 151 001/165)" or "Basic Grass Energy (Scarlet & Violet Energies 001)"
+        title_match = re.search(r'\(([^)]+)\s+(\d+(?:/\d+)?)\)', title)
         if title_match:
             # Only use title set name if we don't have dynamic set name
             if not dynamic_set_name:
                 card['set_name'] = html.unescape(title_match.group(1).strip())
             full_number = title_match.group(2)
             # Store both the normalized number (for matching) and total count (for display)
-            card['number'] = full_number.split('/')[0]
-            card['total_count'] = full_number.split('/')[1] if '/' in full_number else full_number
+            if '/' in full_number:
+                card['number'] = full_number.split('/')[0]
+                card['total_count'] = full_number.split('/')[1]
+            else:
+                # For cards with just individual numbers, store the number and try to find total later
+                card['number'] = full_number
+                card['total_count'] = None  # Will be set later if found
         
         # Look for set code near this card (fallback if dynamic extraction didn't work)
         if not dynamic_set_code:
@@ -116,8 +121,12 @@ def extract_tcg_collector_cards(html_content):
             
             # Second try: look in broader context around the specific card number
             if not card_id_match:
-                total_fallback = card.get("total_count", r"\d+")
-                number_context_pattern = rf'{re.escape(card["number"])}/{re.escape(total_fallback)}.*?data-card-id="(\d+)"'
+                total_fallback = card.get("total_count")
+                if total_fallback:
+                    number_context_pattern = rf'{re.escape(card["number"])}/{re.escape(total_fallback)}.*?data-card-id="(\d+)"'
+                else:
+                    # For cards without total count, just match the card number alone
+                    number_context_pattern = rf'{re.escape(card["number"])}.*?data-card-id="(\d+)"'
                 context_match = re.search(number_context_pattern, html_content, re.IGNORECASE | re.DOTALL)
                 if context_match:
                     card_id_match = context_match
@@ -128,7 +137,8 @@ def extract_tcg_collector_cards(html_content):
         
         has_regular = False
         has_reverse = False
-        
+        variants = []  # Initialize variants list before any conditional logic
+
         if card_id_match:
             card_id = card_id_match.group(1)
             card['card_id'] = card_id  # Store card ID for image fetching
@@ -141,8 +151,6 @@ def extract_tcg_collector_cards(html_content):
                 
                 # Find all indicator spans and determine what variants exist and their status
                 all_spans = re.findall(r'<span[^>]*class="([^"]*card-collection-card-indicator[^"]*)"[^>]*>', indicator_html, re.IGNORECASE)
-                
-                variants = []
                 
                 # Check for standard/normal variant
                 for class_attr in all_spans:
@@ -536,7 +544,7 @@ def generate_individual_set_page(set_name, set_cards):
 
     for card in sorted_cards:
         number = card.get('number', 'XXX')
-        total_count = card.get('total_count', '')
+        total_count = card.get('total_count') or ''
         name = card.get('name', 'Unknown')
         variant = card.get('variant_type', 'Normal')
         card_id = card.get('card_id')
@@ -924,7 +932,7 @@ def generate_html_report(tcg_cards, cm_cards):
         set_name = card.get('set_name', 'Unknown')
         set_code = card.get('set_code', 'UNK')
         number = card.get('number', 'XXX')
-        total_count = card.get('total_count', '')  # Use total count if available
+        total_count = card.get('total_count') or ''  # Use total count if available, handle None
         name = card.get('name', 'Unknown')
         variant = card.get('variant_type', 'Normal')
         card_id = card.get('card_id')
@@ -962,7 +970,7 @@ def generate_html_report(tcg_cards, cm_cards):
                 <td>{html.escape(set_name)}</td>
                 <td>{html.escape(set_code)}</td>
                 <td>{html.escape(number)}</td>
-                <td>{html.escape(total_count)}</td>
+                <td>{html.escape(total_count or 'Unknown')}</td>
                 <td>{html.escape(name)}</td>
                 <td>{html.escape(variant)}</td>
                 <td>{have}</td>
