@@ -305,8 +305,14 @@ def generate_set_overview_page(all_cards):
         }}
         .progress-fill {{
             height: 100%;
-            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+            display: flex;
             transition: width 0.3s ease;
+        }}
+        .progress-owned {{
+            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+        }}
+        .progress-pending {{
+            background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
         }}
         .set-stats {{ font-size: 14px; color: #666; }}
         .set-link {{
@@ -354,9 +360,9 @@ def generate_set_overview_page(all_cards):
     <h2>Sets</h2>
     <div class="set-grid">"""
 
-    # Sort sets by completion percentage (descending)
+    # Sort sets by completion percentage (owned + pending) / total (descending)
     sorted_sets = sorted(set_stats.items(),
-                        key=lambda x: x[1]['owned_cards'] / x[1]['total_cards'] if x[1]['total_cards'] > 0 else 0,
+                        key=lambda x: (x[1]['owned_cards'] + x[1]['pending_cards']) / x[1]['total_cards'] if x[1]['total_cards'] > 0 else 0,
                         reverse=True)
 
     for set_name, stats in sorted_sets:
@@ -372,7 +378,10 @@ def generate_set_overview_page(all_cards):
             <div class="set-code">Set Code: {html.escape(stats['set_code'])}</div>
 
             <div class="progress-bar">
-                <div class="progress-fill" style="width: {completion_percent}%"></div>
+                <div class="progress-fill" style="width: {completion_percent + pending_percent}%">
+                    <div class="progress-owned" style="width: {(completion_percent / (completion_percent + pending_percent) * 100) if (completion_percent + pending_percent) > 0 else 0}%"></div>
+                    <div class="progress-pending" style="width: {(pending_percent / (completion_percent + pending_percent) * 100) if (completion_percent + pending_percent) > 0 else 0}%"></div>
+                </div>
             </div>
 
             <div class="set-stats">
