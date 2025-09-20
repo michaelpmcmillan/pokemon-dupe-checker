@@ -9,15 +9,18 @@ async function generateCardmarketList() {
     outputElement.style.display = 'none';
 
     try {
-        // Get current set cards that need to be purchased
+        // Get currently visible cards that need to be purchased
         const table = document.getElementById('cardTable');
         const rows = table.getElementsByTagName('tr');
         const wantCards = [];
 
-        // Extract card data from table rows
+        // Extract card data from visible table rows only
         for (let i = 1; i < rows.length; i++) {
-            const cells = rows[i].getElementsByTagName('td');
-            if (cells.length >= 7) {
+            const row = rows[i];
+            const cells = row.getElementsByTagName('td');
+
+            // Only process visible rows that need cards
+            if (row.style.display !== 'none' && cells.length >= 7) {
                 const status = cells[6].textContent;
                 if (status === 'Need') {
                     const cardData = {
@@ -31,7 +34,7 @@ async function generateCardmarketList() {
         }
 
         if (wantCards.length === 0) {
-            statusElement.textContent = 'No cards needed from this set!';
+            statusElement.textContent = 'No cards needed from the currently filtered view!';
             buttonElement.disabled = false;
             return;
         }

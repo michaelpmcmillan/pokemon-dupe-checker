@@ -104,22 +104,6 @@
         </div>
     </div>
 
-    <!-- Cardmarket Want List Section -->
-    <div class="cardmarket-section" style="margin: 20px 0; padding: 20px; background-color: #f8f9fa; border-radius: 10px;">
-        <h3 style="margin-top: 0; color: #007bff;">🛒 Cardmarket Want List</h3>
-        <p style="margin-bottom: 15px; color: #666;">
-            Click to generate and copy want lists for cards you need from this set.
-            Lists are automatically converted with abilities included!
-        </p>
-        <div id="cardmarket-controls">
-            <button onclick="generateCardmarketList()" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
-                Generate Want List
-            </button>
-            <span id="cardmarket-status" style="color: #666; font-style: italic;"></span>
-        </div>
-        <div id="cardmarket-output" style="display: none; margin-top: 15px;"></div>
-    </div>
-
     <div class="filters">
         <div class="filter-group">
             <label for="statusFilter">Filter by Status:</label>
@@ -144,6 +128,22 @@
             <label for="searchBox">Search:</label>
             <input type="text" id="searchBox" placeholder="Card name..." onkeyup="filterTable()">
         </div>
+    </div>
+
+    <!-- Cardmarket Want List Section -->
+    <div class="cardmarket-section" style="margin: 20px 0; padding: 20px; background-color: #f8f9fa; border-radius: 10px;">
+        <h3 style="margin-top: 0; color: #007bff;">🛒 Cardmarket Want List</h3>
+        <p style="margin-bottom: 15px; color: #666;">
+            Generate want lists for cards shown in the table below based on your current filters.
+            Lists are automatically converted with abilities included!
+        </p>
+        <div id="cardmarket-controls">
+            <button onclick="generateCardmarketList()" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                Generate Want List for Filtered Cards
+            </button>
+            <span id="cardmarket-status" style="color: #666; font-style: italic;"></span>
+        </div>
+        <div id="cardmarket-output" style="display: none; margin-top: 15px;"></div>
     </div>
 
     <table id="cardTable">
