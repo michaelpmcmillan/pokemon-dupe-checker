@@ -8,6 +8,7 @@ A Python tool that helps you track your Pokemon card collection by analyzing sav
 - 🔍 **Card Preview**: Hover over camera icons to see card images
 - 📈 **Set Statistics**: Completion percentages and detailed breakdowns by set
 - 🎯 **Smart Sorting**: Sets ordered by completion percentage (owned + pending cards)
+- 🔄 **Variant Filtering**: Intelligently filter card variants (All/Best/Normal/Reverse Holo)
 - 🛒 **Cardmarket Want Lists**: Generate properly formatted want lists for cards you need
 - 📱 **Responsive Design**: Works great on desktop and mobile
 
@@ -86,11 +87,40 @@ Open `index.html` in your web browser to start exploring your collection!
 
 - **Detailed Card Lists**: Every card in the set with status indicators
 - **Card Preview**: Hover over 📷 icons to see card images (when available)
+- **Variant Filtering**: Smart filtering options for card variants
 - **Cardmarket Want Lists**: Generate properly formatted want lists for purchasing
 - **Status Indicators**:
   - ✓ = You own this card
   - ✗ = You need this card
   - Different row colors indicate card status
+
+### Variant Filtering
+
+Each individual set page includes intelligent variant filtering options:
+
+#### Filter Options:
+- **All**: Shows every variant entry (default view)
+- **Best**: Smart deduplication showing the best variant for each card
+- **Normal**: Shows only normal variant cards
+- **Reverse Holo**: Shows only reverse holo variant cards
+
+#### "Best" Filter Logic:
+The "Best" filter intelligently chooses which variant to display for each card:
+
+**For cards you own:**
+1. **Owned Reverse Holo** (if you have it)
+2. **Owned Normal** (if you have it)
+
+**For cards you don't own:**
+1. **Normal variant** (easier/cheaper to obtain)
+2. **Reverse Holo** (fallback option)
+
+This gives you a clean, deduplicated view while prioritizing your best cards and practical collection targets.
+
+#### Table Layout:
+- **Fixed column widths** prevent jumping when switching filters
+- **Hover expansion** shows full content for truncated text
+- **Responsive design** works on all screen sizes
 
 ### Cardmarket Want List Generation
 

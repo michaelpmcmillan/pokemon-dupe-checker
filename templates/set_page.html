@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{SET_NAME}} - Pokemon Card Collection</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .back-link { margin-bottom: 20px; }
+        .back-link a { color: #007bff; text-decoration: none; }
+        .back-link a:hover { text-decoration: underline; }
+        .set-header { margin-bottom: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 10px; }
+        .set-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
+        .stat-box { text-align: center; padding: 15px; background: white; border-radius: 8px; }
+        .stat-number { font-size: 24px; font-weight: bold; color: #007bff; }
+        .stat-label { font-size: 14px; color: #666; }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+        }
+        .filters { margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; }
+        .filter-group { display: inline-block; margin-right: 20px; }
+        .filter-group label { font-weight: bold; margin-right: 5px; }
+        .filter-group select, .filter-group input { padding: 5px; }
+        table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        td { position: relative; }
+        td:hover { overflow: visible; white-space: normal; z-index: 10; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        th:nth-child(1), td:nth-child(1) { width: 8%; }  /* Preview */
+        th:nth-child(2), td:nth-child(2) { width: 10%; } /* Card Number */
+        th:nth-child(3), td:nth-child(3) { width: 8%; }  /* Total */
+        th:nth-child(4), td:nth-child(4) { width: 40%; } /* Card Name */
+        th:nth-child(5), td:nth-child(5) { width: 15%; } /* Variant */
+        th:nth-child(6), td:nth-child(6) { width: 8%; }  /* Have */
+        th:nth-child(7), td:nth-child(7) { width: 11%; } /* Status */
+        th { background-color: #f2f2f2; cursor: pointer; }
+        th:hover { background-color: #e9ecef; }
+        .has-card { background-color: #d4edda; }
+        .missing-card { background-color: #f8d7da; }
+        .pending { background-color: #fff3cd; }
+        .camera-icon {
+            cursor: pointer;
+            color: #007bff;
+            margin-left: 5px;
+            font-size: 14px;
+            position: relative;
+        }
+        .camera-icon:hover { color: #0056b3; }
+        .card-preview {
+            position: absolute;
+            z-index: 1000;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 5px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            max-width: 200px;
+            display: none;
+            pointer-events: auto;
+        }
+        .card-preview img {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="back-link">
+        <a href="index.html">← Back to Collection Overview</a>
+    </div>
+
+    <div class="set-header">
+        <h1>{{SET_NAME}}</h1>
+        <p><strong>Set Code:</strong> {{SET_CODE}}</p>
+
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{COMPLETION_PERCENT}}%"></div>
+        </div>
+
+        <div class="set-stats">
+            <div class="stat-box">
+                <div class="stat-number">{{TOTAL_CARDS}}</div>
+                <div class="stat-label">Total Cards</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">{{OWNED_CARDS}}</div>
+                <div class="stat-label">Owned</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">{{PENDING_CARDS}}</div>
+                <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">{{COMPLETION_PERCENT}}%</div>
+                <div class="stat-label">Complete</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cardmarket Want List Section -->
+    <div class="cardmarket-section" style="margin: 20px 0; padding: 20px; background-color: #f8f9fa; border-radius: 10px;">
+        <h3 style="margin-top: 0; color: #007bff;">🛒 Cardmarket Want List</h3>
+        <p style="margin-bottom: 15px; color: #666;">
+            Click to generate and copy want lists for cards you need from this set.
+            Lists are automatically converted with abilities included!
+        </p>
+        <div id="cardmarket-controls">
+            <button onclick="generateCardmarketList()" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                Generate Want List
+            </button>
+            <span id="cardmarket-status" style="color: #666; font-style: italic;"></span>
+        </div>
+        <div id="cardmarket-output" style="display: none; margin-top: 15px;"></div>
+    </div>
+
+    <div class="filters">
+        <div class="filter-group">
+            <label for="statusFilter">Filter by Status:</label>
+            <select id="statusFilter" onchange="filterTable()">
+                <option value="All">All</option>
+                <option value="Have">Have</option>
+                <option value="Need">Need</option>
+                <option value="Pending Purchase">Pending Purchase</option>
+                <option value="Have + Pending Purchase (Duplicate!)">Have + Pending Purchase (Duplicate!)</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="variantFilter">Variant:</label>
+            <select id="variantFilter" onchange="filterTable()">
+                <option value="All">All</option>
+                <option value="Best">Best</option>
+                <option value="Normal">Normal</option>
+                <option value="Reverse Holo">Reverse Holo</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="searchBox">Search:</label>
+            <input type="text" id="searchBox" placeholder="Card name..." onkeyup="filterTable()">
+        </div>
+    </div>
+
+    <table id="cardTable">
+        <thead>
+            <tr>
+                <th>Preview</th>
+                <th onclick="sortTable(1)">Card Number</th>
+                <th onclick="sortTable(2)">Total</th>
+                <th onclick="sortTable(3)">Card Name</th>
+                <th onclick="sortTable(4)">Variant</th>
+                <th onclick="sortTable(5)">Have</th>
+                <th onclick="sortTable(6)">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+{{CARD_ROWS}}
+        </tbody>
+    </table>
+
+    <script>
+    // Apply filters on page load
+    window.onload = function() {
+        filterTable();
+    };
+
+    function filterTable() {
+        var statusFilter = document.getElementById("statusFilter").value;
+        var variantFilter = document.getElementById("variantFilter").value;
+        var searchBox = document.getElementById("searchBox").value.toLowerCase();
+        var table = document.getElementById("cardTable");
+        var rows = table.getElementsByTagName("tr");
+
+        // First pass: apply status and search filters
+        var visibleRows = [];
+        for (var i = 1; i < rows.length; i++) {
+            var row = rows[i];
+            var cells = row.getElementsByTagName("td");
+            var cardName = cells[3].textContent.toLowerCase();
+            var status = cells[6].textContent;
+
+            var showRow = true;
+
+            // Filter by status
+            if (statusFilter !== "All" && status !== statusFilter) {
+                showRow = false;
+            }
+
+            // Filter by search
+            if (searchBox !== "" && !cardName.includes(searchBox)) {
+                showRow = false;
+            }
+
+            if (showRow) {
+                visibleRows.push(row);
+            } else {
+                row.style.display = "none";
+            }
+        }
+
+        // Second pass: apply variant filtering
+        if (variantFilter === "All") {
+            // Show all visible rows
+            visibleRows.forEach(function(row) {
+                row.style.display = "";
+            });
+        } else if (variantFilter === "Best") {
+            // Group by card name + number, show best variant
+            var cardGroups = {};
+
+            visibleRows.forEach(function(row) {
+                var cells = row.getElementsByTagName("td");
+                var cardName = cells[3].textContent;
+                var cardNumber = cells[1].textContent;
+                var variant = cells[4].textContent;
+                var status = cells[6].textContent;
+                var hasCard = status === "Have" || status === "Have + Pending Purchase (Duplicate!)";
+
+                var key = cardName + "_" + cardNumber;
+
+                if (!cardGroups[key]) {
+                    cardGroups[key] = [];
+                }
+
+                cardGroups[key].push({
+                    row: row,
+                    variant: variant,
+                    hasCard: hasCard
+                });
+            });
+
+            // Hide all rows first
+            visibleRows.forEach(function(row) {
+                row.style.display = "none";
+            });
+
+            // Show best variant for each card
+            Object.keys(cardGroups).forEach(function(key) {
+                var group = cardGroups[key];
+                var bestRow = null;
+
+                // Priority: owned reverse holo > owned normal > unowned normal > unowned reverse holo
+                var ownedReverseHolo = group.find(function(item) {
+                    return item.hasCard && item.variant === "Reverse Holo";
+                });
+                var ownedNormal = group.find(function(item) {
+                    return item.hasCard && item.variant === "Normal";
+                });
+                var anyNormal = group.find(function(item) {
+                    return item.variant === "Normal";
+                });
+                var anyReverseHolo = group.find(function(item) {
+                    return item.variant === "Reverse Holo";
+                });
+
+                if (ownedReverseHolo) {
+                    bestRow = ownedReverseHolo.row;
+                } else if (ownedNormal) {
+                    bestRow = ownedNormal.row;
+                } else if (anyNormal) {
+                    bestRow = anyNormal.row;
+                } else if (anyReverseHolo) {
+                    bestRow = anyReverseHolo.row;
+                } else if (group.length > 0) {
+                    bestRow = group[0].row; // fallback to first row
+                }
+
+                if (bestRow) {
+                    bestRow.style.display = "";
+                }
+            });
+        } else {
+            // Filter by specific variant
+            visibleRows.forEach(function(row) {
+                var cells = row.getElementsByTagName("td");
+                var variant = cells[4].textContent;
+
+                if (variant === variantFilter) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
+            });
+        }
+    }
+
+    function sortTable(columnIndex) {
+        var table = document.getElementById("cardTable");
+        var tbody = table.getElementsByTagName("tbody")[0];
+        var rows = Array.from(tbody.getElementsByTagName("tr"));
+
+        rows.sort(function(a, b) {
+            var aValue = a.getElementsByTagName("td")[columnIndex].textContent;
+            var bValue = b.getElementsByTagName("td")[columnIndex].textContent;
+
+            // Try to parse as numbers for numeric columns
+            if (columnIndex === 1) { // Card Number column
+                var aNum = parseInt(aValue);
+                var bNum = parseInt(bValue);
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return aNum - bNum;
+                }
+            }
+
+            return aValue.localeCompare(bValue);
+        });
+
+        rows.forEach(function(row) {
+            tbody.appendChild(row);
+        });
+    }
+
+    let cardPreviewElement = null;
+    let cardImageCache = {};
+    let hideTimeout = null;
+
+    async function showCardPreview(event, cardId) {
+        // Clear any pending hide timeout
+        if (hideTimeout) {
+            clearTimeout(hideTimeout);
+            hideTimeout = null;
+        }
+        if (!cardId) return;
+
+        // Create preview element if it doesn't exist
+        if (!cardPreviewElement) {
+            cardPreviewElement = document.createElement('div');
+            cardPreviewElement.className = 'card-preview';
+
+            // Add hover events to keep popup visible when hovering over it
+            cardPreviewElement.addEventListener('mouseenter', function() {
+                if (hideTimeout) {
+                    clearTimeout(hideTimeout);
+                    hideTimeout = null;
+                }
+            });
+
+            cardPreviewElement.addEventListener('mouseleave', function() {
+                hideCardPreview();
+            });
+
+            document.body.appendChild(cardPreviewElement);
+        }
+
+        // Position the preview near the mouse cursor
+        const rect = event.target.getBoundingClientRect();
+        cardPreviewElement.style.left = (rect.right + 10) + 'px';
+        cardPreviewElement.style.top = rect.top + 'px';
+
+        // Check if we have the image URL cached
+        if (cardImageCache[cardId]) {
+            if (cardImageCache[cardId] !== 'failed' && cardImageCache[cardId] !== 'link') {
+                cardPreviewElement.innerHTML = `<img src="${cardImageCache[cardId]}" alt="Card preview" />`;
+                cardPreviewElement.style.display = 'block';
+            } else if (cardImageCache[cardId] === 'link') {
+                cardPreviewElement.innerHTML = `
+                    <div style="padding: 10px; text-align: center;">
+                        <p>🔗 <a href="https://www.tcgcollector.com/cards/${cardId}/" target="_blank" style="color: #007bff;">View card on TCG Collector</a></p>
+                        <small>Image preview blocked by CORS</small>
+                    </div>
+                `;
+                cardPreviewElement.style.display = 'block';
+            }
+            return;
+        }
+
+        // Show loading message
+        cardPreviewElement.innerHTML = '<div style="padding: 10px;">Loading...</div>';
+        cardPreviewElement.style.display = 'block';
+
+        try {
+            // Try to fetch the card detail page to get the actual image URL
+            // Note: This will likely fail due to CORS, but we'll provide a fallback
+            fetch(`https://www.tcgcollector.com/cards/${cardId}/`)
+                .then(response => response.text())
+                .then(html => {
+                    // Extract the image URL from the HTML - handle multiple formats
+                    const imageMatch = html.match(/https:\/\/static\.tcgcollector\.com\/content\/images\/[a-f0-9\/]+\.(jpg|webp|png)/);
+                    if (imageMatch) {
+                        const imageUrl = imageMatch[0];
+                        cardImageCache[cardId] = imageUrl;
+                        if (cardPreviewElement.style.display === 'block') {
+                            cardPreviewElement.innerHTML = `<img src="${imageUrl}" alt="Card preview" />`;
+                        }
+                    } else {
+                        throw new Error('Image URL not found');
+                    }
+                })
+                .catch(error => {
+                    // CORS fallback: Show card link instead of image
+                    console.log('CORS prevented image fetch, showing link instead:', error);
+                    cardImageCache[cardId] = 'link';
+                    if (cardPreviewElement.style.display === 'block') {
+                        cardPreviewElement.innerHTML = `
+                            <div style="padding: 10px; text-align: center;">
+                                <p>🔗 <a href="https://www.tcgcollector.com/cards/${cardId}/" target="_blank" style="color: #007bff;">View card on TCG Collector</a></p>
+                                <small>Image preview blocked by CORS</small>
+                            </div>
+                        `;
+                    }
+                });
+
+        } catch (error) {
+            console.log('Error loading card preview:', error);
+            cardPreviewElement.style.display = 'none';
+            cardImageCache[cardId] = 'failed';
+        }
+    }
+
+    function hideCardPreview() {
+        // Use a small delay to allow moving mouse to the preview popup
+        hideTimeout = setTimeout(function() {
+            if (cardPreviewElement) {
+                cardPreviewElement.style.display = 'none';
+            }
+        }, 100);
+    }
+
+{{CARDMARKET_JS}}
+    </script>
+</body>
+</html>

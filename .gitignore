@@ -1,8 +1,8 @@
 # Data folder containing HTML files
 data/
 
-# Generated HTML reports
-*.html
+# Generated HTML reports (but not templates)
+/*.html
 
 # Python cache
 __pycache__/

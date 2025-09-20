@@ -51,6 +51,11 @@ A Python-based tool that analyzes saved HTML pages from TCG Collector and Cardma
 - **Problem**: Cardmarket want lists limited to 150 cards
 - **Solution**: Split large lists into chunks of 150 cards each
 
+### Variant Filtering System
+- **Problem**: Users wanted to filter card variants and see cleaner views
+- **Solution**: Implemented multi-mode filtering with intelligent "Best" logic
+- **Implementation**: Client-side JavaScript filtering with stable table layout
+
 ## Important Code Patterns
 
 ### Template Variable Replacement
@@ -84,6 +89,37 @@ wantCards.forEach(card => {
 });
 ```
 
+### Variant Filtering Logic
+```javascript
+// "Best" filter prioritization
+var ownedReverseHolo = group.find(item => item.hasCard && item.variant === "Reverse Holo");
+var ownedNormal = group.find(item => item.hasCard && item.variant === "Normal");
+var anyNormal = group.find(item => item.variant === "Normal");
+var anyReverseHolo = group.find(item => item.variant === "Reverse Holo");
+
+// Priority: owned reverse holo > owned normal > unowned normal > unowned reverse holo
+if (ownedReverseHolo) {
+    bestRow = ownedReverseHolo.row;
+} else if (ownedNormal) {
+    bestRow = ownedNormal.row;
+} else if (anyNormal) {
+    bestRow = anyNormal.row;
+} else if (anyReverseHolo) {
+    bestRow = anyReverseHolo.row;
+}
+```
+
+### Stable Table Layout
+```css
+/* Fixed table layout prevents column jumping */
+table { table-layout: fixed; }
+th:nth-child(1), td:nth-child(1) { width: 8%; }  /* Preview */
+th:nth-child(4), td:nth-child(4) { width: 40%; } /* Card Name */
+/* Text overflow handling */
+th, td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+td:hover { overflow: visible; white-space: normal; }
+```
+
 ## Common Tasks
 
 ### Adding New Template Variables
@@ -102,6 +138,12 @@ wantCards.forEach(card => {
 - Main logic in `templates/cardmarket.js`
 - Test with sets that have >150 cards to verify chunking
 - Verify card number formatting (no leading zeros)
+
+### Modifying Variant Filter Logic
+- Filtering logic in `templates/set_page.html` within `filterTable()` function
+- "Best" filter logic prioritizes owned reverse holo, then owned normal, then unowned normal
+- Test with sets containing both normal and reverse holo variants
+- Column widths defined in CSS prevent layout jumping
 
 ## Testing
 
