@@ -146,6 +146,10 @@
         <div id="cardmarket-output" style="display: none; margin-top: 15px;"></div>
     </div>
 
+    <div id="tableInfo" style="margin: 10px 0; padding: 10px; background-color: #e9ecef; border-radius: 5px; font-size: 14px; color: #666;">
+        <span id="visibleCount"></span>
+    </div>
+
     <table id="cardTable">
         <thead>
             <tr>
@@ -204,10 +208,12 @@
         }
 
         // Second pass: apply variant filtering
+        var finalVisibleCount = 0;
         if (variantFilter === "All") {
             // Show all visible rows
             visibleRows.forEach(function(row) {
                 row.style.display = "";
+                finalVisibleCount++;
             });
         } else if (variantFilter === "Best") {
             // Group by card name + number, show best variant
@@ -272,6 +278,7 @@
 
                 if (bestRow) {
                     bestRow.style.display = "";
+                    finalVisibleCount++;
                 }
             });
         } else {
@@ -282,10 +289,20 @@
 
                 if (variant === variantFilter) {
                     row.style.display = "";
+                    finalVisibleCount++;
                 } else {
                     row.style.display = "none";
                 }
             });
+        }
+
+        // Update visible count display
+        var totalRows = document.getElementById("cardTable").getElementsByTagName("tr").length - 1; // -1 for header
+        var countElement = document.getElementById("visibleCount");
+        if (finalVisibleCount === totalRows) {
+            countElement.textContent = "Showing all " + totalRows + " cards";
+        } else {
+            countElement.textContent = "Showing " + finalVisibleCount + " of " + totalRows + " cards";
         }
     }
 

@@ -56,6 +56,16 @@ A Python-based tool that analyzes saved HTML pages from TCG Collector and Cardma
 - **Solution**: Implemented multi-mode filtering with intelligent "Best" logic
 - **Implementation**: Client-side JavaScript filtering with stable table layout
 
+### Filter-Aware Want List Generation
+- **Problem**: Users wanted separate want lists for normal vs reverse holo variants
+- **Solution**: Modified want list generation to respect current table filters
+- **Implementation**: Want list only processes visible table rows, moved UI below filters
+
+### Filtered Item Count Display
+- **Problem**: Users needed to see how many cards are visible after filtering
+- **Solution**: Added dynamic count display showing "X of Y cards" or "Showing all X cards"
+- **Implementation**: JavaScript updates count in real-time as filters change
+
 ## Important Code Patterns
 
 ### Template Variable Replacement
@@ -109,6 +119,35 @@ if (ownedReverseHolo) {
 }
 ```
 
+### Filter-Aware Want List Generation
+```javascript
+// Only process visible rows that need cards
+for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const cells = row.getElementsByTagName('td');
+
+    // Only process visible rows that need cards
+    if (row.style.display !== 'none' && cells.length >= 7) {
+        const status = cells[6].textContent;
+        if (status === 'Need') {
+            // Add to want list
+        }
+    }
+}
+```
+
+### Dynamic Item Count Display
+```javascript
+// Update visible count display
+var totalRows = document.getElementById("cardTable").getElementsByTagName("tr").length - 1; // -1 for header
+var countElement = document.getElementById("visibleCount");
+if (finalVisibleCount === totalRows) {
+    countElement.textContent = "Showing all " + totalRows + " cards";
+} else {
+    countElement.textContent = "Showing " + finalVisibleCount + " of " + totalRows + " cards";
+}
+```
+
 ### Stable Table Layout
 ```css
 /* Fixed table layout prevents column jumping */
@@ -144,6 +183,13 @@ td:hover { overflow: visible; white-space: normal; }
 - "Best" filter logic prioritizes owned reverse holo, then owned normal, then unowned normal
 - Test with sets containing both normal and reverse holo variants
 - Column widths defined in CSS prevent layout jumping
+
+### Working with Filter-Aware Want Lists
+- Want list generation logic in `templates/cardmarket.js`
+- Only processes rows where `row.style.display !== 'none'`
+- UI positioned below filters for intuitive workflow: filter first, then generate
+- Button text clarifies it works on "filtered cards"
+- Status messages reflect "currently filtered view" instead of entire set
 
 ## Testing
 
@@ -254,4 +300,4 @@ rm *.html want_list_*.txt test_template_output.html
 
 ---
 
-*Last updated: Session that implemented template system and CORS bypass for want list generation*
+*Last updated: Session that implemented filter-aware want list generation, visible card count display, and improved UX flow*

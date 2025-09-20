@@ -87,6 +87,8 @@ Open `index.html` in your web browser to start exploring your collection!
 
 - **Detailed Card Lists**: Every card in the set with status indicators
 - **Card Preview**: Hover over 📷 icons to see card images (when available)
+- **Filter Controls**: Filter by status, variant, or search by card name
+- **Visible Card Count**: See how many cards are currently displayed
 - **Variant Filtering**: Smart filtering options for card variants
 - **Cardmarket Want Lists**: Generate properly formatted want lists for purchasing
 - **Status Indicators**:
@@ -124,8 +126,9 @@ This gives you a clean, deduplicated view while prioritizing your best cards and
 
 ### Cardmarket Want List Generation
 
-Each individual set page includes a "Generate Want List" feature that:
+Each individual set page includes a smart "Generate Want List" feature that:
 
+- **Respects your filters**: Only generates lists for cards currently visible in the table
 - **Automatically converts** your needed cards to Cardmarket format
 - **Includes abilities** for each card (via pokedata.ovh API)
 - **Strips leading zeros** from card numbers (e.g., "049" becomes "49")
@@ -133,11 +136,18 @@ Each individual set page includes a "Generate Want List" feature that:
 - **Splits large lists** into chunks of 150 cards (Cardmarket's limit)
 - **Provides copy buttons** for easy pasting into Cardmarket
 
-To use:
+#### Creating Variant-Specific Want Lists:
 1. Visit any individual set page (e.g., `Journey_Together.html`)
-2. Click "Generate Want List" in the blue section
-3. Wait for the API conversion to complete
-4. Copy the formatted text and paste directly into Cardmarket's want list
+2. **Set your filters first**:
+   - For Normal cards only: Set "Variant" filter to "Normal"
+   - For Reverse Holo cards only: Set "Variant" filter to "Reverse Holo"
+   - For specific cards: Use the search box to filter by name
+   - For incomplete cards only: Set "Status" filter to "Need"
+3. Click "Generate Want List for Filtered Cards"
+4. Wait for the API conversion to complete
+5. Copy the formatted text and paste directly into Cardmarket's want list
+
+This workflow allows you to create separate want lists for different variants, making it easy to mark entire lists as "reverse holo" in Cardmarket's interface.
 
 ### Status Legend
 
