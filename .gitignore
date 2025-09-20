@@ -31,3 +31,9 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Generated want lists
+want_list_*.txt
+
+# Test files (can be regenerated)
+test_template_output.html

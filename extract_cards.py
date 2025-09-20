@@ -8,7 +8,9 @@ import re
 import html
 import requests
 import time
+from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 def extract_set_info_from_tcg_collector(html_content):
     """Extract set name and code from TCG Collector HTML"""
@@ -400,8 +402,62 @@ def generate_set_overview_page(all_cards):
 
     return html_content
 
+def generate_cardmarket_want_list_for_set(set_name, set_cards, chunk_size=200):
+    """Generate Cardmarket want list for a specific set, chunked for size limits"""
+
+    # Filter for cards you don't have and aren't pending
+    want_cards = [card for card in set_cards if not card.get('has_card') and not card.get('cardmarket_pending')]
+
+    if not want_cards:
+        return []
+
+    # Sort by number
+    sorted_cards = sorted(want_cards, key=lambda x: (int(x.get('number', '999')) if x.get('number', '999').isdigit() else 999, x.get('name', '')))
+
+    # Create decklist format
+    decklist_lines = []
+    for card in sorted_cards:
+        number = card.get('number', '???')
+        name = card.get('name', 'Unknown')
+        set_code = card.get('set_code', 'UNK')
+        variant = card.get('variant_type', 'Normal')
+
+        if variant != 'Normal':
+            decklist_lines.append(f"1 {name} ({variant}) {set_code} {number}")
+        else:
+            decklist_lines.append(f"1 {name} {set_code} {number}")
+
+    # Split into chunks
+    chunks = []
+    for i in range(0, len(decklist_lines), chunk_size):
+        chunk = decklist_lines[i:i + chunk_size]
+        chunks.append('\n'.join(chunk))
+
+    # Convert each chunk via API
+    converted_chunks = []
+    for i, chunk in enumerate(chunks):
+        print(f"Converting chunk {i+1}/{len(chunks)} for {set_name}...")
+        converted = convert_decklist_to_cardmarket(chunk)
+        if converted:
+            converted_chunks.append(converted.strip())
+        else:
+            # Fallback to manual format if conversion fails
+            lines = chunk.split('\n')
+            manual_lines = []
+            for line in lines:
+                if line.strip():
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        card_name = ' '.join(parts[1:-2])
+                        set_code = parts[-2]
+                        manual_lines.append(f"{card_name} [ABILITY] [{set_code}]")
+            converted_chunks.append('\n'.join(manual_lines))
+
+    return converted_chunks
+
 def generate_individual_set_page(set_name, set_cards):
-    """Generate individual set page with detailed card list"""
+    """Generate individual set page with detailed card list using templates"""
+    import html
 
     # Calculate set statistics
     total_cards = len(set_cards)
@@ -412,133 +468,16 @@ def generate_individual_set_page(set_name, set_cards):
     # Get set code (assuming all cards in set have same code)
     set_code = set_cards[0].get('set_code', 'UNK') if set_cards else 'UNK'
 
-    html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>{html.escape(set_name)} - Pokemon Card Collection</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; }}
-        .back-link {{ margin-bottom: 20px; }}
-        .back-link a {{ color: #007bff; text-decoration: none; }}
-        .back-link a:hover {{ text-decoration: underline; }}
-        .set-header {{ margin-bottom: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 10px; }}
-        .set-stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }}
-        .stat-box {{ text-align: center; padding: 15px; background: white; border-radius: 8px; }}
-        .stat-number {{ font-size: 24px; font-weight: bold; color: #007bff; }}
-        .stat-label {{ font-size: 14px; color: #666; }}
-        .progress-bar {{
-            width: 100%;
-            height: 20px;
-            background-color: #e9ecef;
-            border-radius: 10px;
-            overflow: hidden;
-            margin: 15px 0;
-        }}
-        .progress-fill {{
-            height: 100%;
-            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
-        }}
-        .filters {{ margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; }}
-        .filter-group {{ display: inline-block; margin-right: 20px; }}
-        .filter-group label {{ font-weight: bold; margin-right: 5px; }}
-        .filter-group select, .filter-group input {{ padding: 5px; }}
-        table {{ border-collapse: collapse; width: 100%; }}
-        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-        th {{ background-color: #f2f2f2; cursor: pointer; }}
-        th:hover {{ background-color: #e9ecef; }}
-        .has-card {{ background-color: #d4edda; }}
-        .missing-card {{ background-color: #f8d7da; }}
-        .pending {{ background-color: #fff3cd; }}
-        .camera-icon {{
-            cursor: pointer;
-            color: #007bff;
-            margin-left: 5px;
-            font-size: 14px;
-            position: relative;
-        }}
-        .camera-icon:hover {{ color: #0056b3; }}
-        .card-preview {{
-            position: absolute;
-            z-index: 1000;
-            background: white;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            padding: 5px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            max-width: 200px;
-            display: none;
-            pointer-events: auto;
-        }}
-        .card-preview img {{
-            width: 100%;
-            height: auto;
-            border-radius: 4px;
-        }}
-    </style>
-</head>
-<body>
-    <div class="back-link">
-        <a href="index.html">← Back to Collection Overview</a>
-    </div>
+    # Load HTML template
+    with open('templates/set_page.html', 'r', encoding='utf-8') as f:
+        html_template = f.read()
 
-    <div class="set-header">
-        <h1>{html.escape(set_name)}</h1>
-        <p><strong>Set Code:</strong> {html.escape(set_code)}</p>
+    # Load JavaScript template
+    with open('templates/cardmarket.js', 'r', encoding='utf-8') as f:
+        js_template = f.read()
 
-        <div class="progress-bar">
-            <div class="progress-fill" style="width: {completion_percent}%"></div>
-        </div>
-
-        <div class="set-stats">
-            <div class="stat-box">
-                <div class="stat-number">{total_cards}</div>
-                <div class="stat-label">Total Cards</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-number">{owned_cards}</div>
-                <div class="stat-label">Owned</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-number">{pending_cards}</div>
-                <div class="stat-label">Pending</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-number">{completion_percent:.1f}%</div>
-                <div class="stat-label">Complete</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="filters">
-        <div class="filter-group">
-            <label for="statusFilter">Filter by Status:</label>
-            <select id="statusFilter" onchange="filterTable()">
-                <option value="All">All</option>
-                <option value="Have">Have</option>
-                <option value="Need">Need</option>
-                <option value="Pending Purchase">Pending Purchase</option>
-                <option value="Have + Pending Purchase (Duplicate!)">Have + Pending Purchase (Duplicate!)</option>
-            </select>
-        </div>
-        <div class="filter-group">
-            <label for="searchBox">Search:</label>
-            <input type="text" id="searchBox" placeholder="Card name..." onkeyup="filterTable()">
-        </div>
-    </div>
-
-    <table id="cardTable">
-        <thead>
-            <tr>
-                <th>Preview</th>
-                <th onclick="sortTable(1)">Card Number</th>
-                <th onclick="sortTable(2)">Total</th>
-                <th onclick="sortTable(3)">Card Name</th>
-                <th onclick="sortTable(4)">Variant</th>
-                <th onclick="sortTable(5)">Have</th>
-                <th onclick="sortTable(6)">Status</th>
-            </tr>
-        </thead>
-        <tbody>"""
+    # Generate card rows HTML
+    card_rows_html = ""
 
     # Sort cards by number and variant
     def sort_key(card):
@@ -584,7 +523,7 @@ def generate_individual_set_page(set_name, set_cards):
             status = 'Pending Purchase'
             row_class = 'pending'
 
-        html_content += f"""
+        card_rows_html += f"""
             <tr class="{row_class}">
                 <td style="text-align: center;">{camera_icon_html}</td>
                 <td>{html.escape(number)}</td>
@@ -595,178 +534,18 @@ def generate_individual_set_page(set_name, set_cards):
                 <td>{status}</td>
             </tr>"""
 
-    html_content += """
-        </tbody>
-    </table>
+    # Replace placeholders in JavaScript template
+    js_code = js_template.replace('{{SET_CODE}}', set_code)
 
-    <script>
-    // Apply filters on page load
-    window.onload = function() {
-        filterTable();
-    };
-
-    function filterTable() {
-        var statusFilter = document.getElementById("statusFilter").value;
-        var searchBox = document.getElementById("searchBox").value.toLowerCase();
-        var table = document.getElementById("cardTable");
-        var rows = table.getElementsByTagName("tr");
-
-        for (var i = 1; i < rows.length; i++) {
-            var row = rows[i];
-            var cells = row.getElementsByTagName("td");
-            var cardName = cells[3].textContent.toLowerCase();
-            var status = cells[6].textContent;
-
-            var showRow = true;
-
-            // Filter by status
-            if (statusFilter !== "All" && status !== statusFilter) {
-                showRow = false;
-            }
-
-            // Filter by search
-            if (searchBox !== "" && !cardName.includes(searchBox)) {
-                showRow = false;
-            }
-
-            row.style.display = showRow ? "" : "none";
-        }
-    }
-
-    function sortTable(columnIndex) {
-        var table = document.getElementById("cardTable");
-        var tbody = table.getElementsByTagName("tbody")[0];
-        var rows = Array.from(tbody.getElementsByTagName("tr"));
-
-        rows.sort(function(a, b) {
-            var aValue = a.getElementsByTagName("td")[columnIndex].textContent;
-            var bValue = b.getElementsByTagName("td")[columnIndex].textContent;
-
-            // Try to parse as numbers for numeric columns
-            if (columnIndex === 1) { // Card Number column
-                var aNum = parseInt(aValue);
-                var bNum = parseInt(bValue);
-                if (!isNaN(aNum) && !isNaN(bNum)) {
-                    return aNum - bNum;
-                }
-            }
-
-            return aValue.localeCompare(bValue);
-        });
-
-        rows.forEach(function(row) {
-            tbody.appendChild(row);
-        });
-    }
-
-    let cardPreviewElement = null;
-    let cardImageCache = {};
-    let hideTimeout = null;
-
-    async function showCardPreview(event, cardId) {
-        // Clear any pending hide timeout
-        if (hideTimeout) {
-            clearTimeout(hideTimeout);
-            hideTimeout = null;
-        }
-        if (!cardId) return;
-
-        // Create preview element if it doesn't exist
-        if (!cardPreviewElement) {
-            cardPreviewElement = document.createElement('div');
-            cardPreviewElement.className = 'card-preview';
-
-            // Add hover events to keep popup visible when hovering over it
-            cardPreviewElement.addEventListener('mouseenter', function() {
-                if (hideTimeout) {
-                    clearTimeout(hideTimeout);
-                    hideTimeout = null;
-                }
-            });
-
-            cardPreviewElement.addEventListener('mouseleave', function() {
-                hideCardPreview();
-            });
-
-            document.body.appendChild(cardPreviewElement);
-        }
-
-        // Position the preview near the mouse cursor
-        const rect = event.target.getBoundingClientRect();
-        cardPreviewElement.style.left = (rect.right + 10) + 'px';
-        cardPreviewElement.style.top = rect.top + 'px';
-
-        // Check if we have the image URL cached
-        if (cardImageCache[cardId]) {
-            if (cardImageCache[cardId] !== 'failed' && cardImageCache[cardId] !== 'link') {
-                cardPreviewElement.innerHTML = `<img src="${cardImageCache[cardId]}" alt="Card preview" />`;
-                cardPreviewElement.style.display = 'block';
-            } else if (cardImageCache[cardId] === 'link') {
-                cardPreviewElement.innerHTML = `
-                    <div style="padding: 10px; text-align: center;">
-                        <p>🔗 <a href="https://www.tcgcollector.com/cards/${cardId}/" target="_blank" style="color: #007bff;">View card on TCG Collector</a></p>
-                        <small>Image preview blocked by CORS</small>
-                    </div>
-                `;
-                cardPreviewElement.style.display = 'block';
-            }
-            return;
-        }
-
-        // Show loading message
-        cardPreviewElement.innerHTML = '<div style="padding: 10px;">Loading...</div>';
-        cardPreviewElement.style.display = 'block';
-
-        try {
-            // Try to fetch the card detail page to get the actual image URL
-            // Note: This will likely fail due to CORS, but we'll provide a fallback
-            fetch(`https://www.tcgcollector.com/cards/${cardId}/`)
-                .then(response => response.text())
-                .then(html => {
-                    // Extract the image URL from the HTML - handle multiple formats
-                    const imageMatch = html.match(/https:\\/\\/static\\.tcgcollector\\.com\\/content\\/images\\/[a-f0-9\\/]+\\.(jpg|webp|png)/);
-                    if (imageMatch) {
-                        const imageUrl = imageMatch[0];
-                        cardImageCache[cardId] = imageUrl;
-                        if (cardPreviewElement.style.display === 'block') {
-                            cardPreviewElement.innerHTML = `<img src="${imageUrl}" alt="Card preview" />`;
-                        }
-                    } else {
-                        throw new Error('Image URL not found');
-                    }
-                })
-                .catch(error => {
-                    // CORS fallback: Show card link instead of image
-                    console.log('CORS prevented image fetch, showing link instead:', error);
-                    cardImageCache[cardId] = 'link';
-                    if (cardPreviewElement.style.display === 'block') {
-                        cardPreviewElement.innerHTML = `
-                            <div style="padding: 10px; text-align: center;">
-                                <p>🔗 <a href="https://www.tcgcollector.com/cards/${cardId}/" target="_blank" style="color: #007bff;">View card on TCG Collector</a></p>
-                                <small>Image preview blocked by CORS</small>
-                            </div>
-                        `;
-                    }
-                });
-
-        } catch (error) {
-            console.log('Error loading card preview:', error);
-            cardPreviewElement.style.display = 'none';
-            cardImageCache[cardId] = 'failed';
-        }
-    }
-
-    function hideCardPreview() {
-        // Use a small delay to allow moving mouse to the preview popup
-        hideTimeout = setTimeout(function() {
-            if (cardPreviewElement) {
-                cardPreviewElement.style.display = 'none';
-            }
-        }, 100);
-    }
-    </script>
-</body>
-</html>"""
+    # Replace placeholders in HTML template
+    html_content = html_template.replace('{{SET_NAME}}', html.escape(set_name))
+    html_content = html_content.replace('{{SET_CODE}}', html.escape(set_code))
+    html_content = html_content.replace('{{TOTAL_CARDS}}', str(total_cards))
+    html_content = html_content.replace('{{OWNED_CARDS}}', str(owned_cards))
+    html_content = html_content.replace('{{PENDING_CARDS}}', str(pending_cards))
+    html_content = html_content.replace('{{COMPLETION_PERCENT}}', f"{completion_percent:.1f}")
+    html_content = html_content.replace('{{CARD_ROWS}}', card_rows_html)
+    html_content = html_content.replace('{{CARDMARKET_JS}}', js_code)
 
     return html_content
 
@@ -779,6 +558,7 @@ def build_set_mapping_from_tcg_cards(tcg_cards):
         if set_code and set_name:
             set_mapping[set_code] = set_name
     return set_mapping
+
 
 def generate_html_report(tcg_cards, cm_cards):
     """Generate HTML report showing card status"""
@@ -1304,6 +1084,231 @@ def main():
     print(f"- index.html (overview)")
     print(f"- {len(sets_by_name)} individual set pages")
     print(f"- card_collection_report.html (legacy single page)")
+
+    # Generate want lists
+    print(f"\nGenerating want lists...")
+    generate_want_lists(all_cards)
+
+def convert_decklist_to_cardmarket(decklist_text):
+    """Convert decklist format to Cardmarket format using pokedata.ovh API"""
+    try:
+        # Prepare the POST data
+        post_data = f"decklist={quote(decklist_text)}"
+
+        # Headers matching the working browser request
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-GB,en;q=0.5',
+            'Referer': 'https://www.pokedata.ovh/misc/cardmarket',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': 'https://www.pokedata.ovh',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+            'Pragma': 'no-cache',
+            'Cache-Control': 'no-cache'
+        }
+
+        # Make the request
+        response = requests.post(
+            'https://www.pokedata.ovh/misc/cardmarket',
+            data=post_data,
+            headers=headers,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            # Extract the converted text from the textarea
+            import re
+            textarea_pattern = r'<textarea[^>]*id="cardmarket"[^>]*>(.*?)</textarea>'
+            match = re.search(textarea_pattern, response.text, re.DOTALL)
+            if match:
+                converted_text = match.group(1).strip()
+                return converted_text
+            else:
+                print("Warning: Could not find converted text in response")
+                return None
+        else:
+            print(f"Warning: Converter API returned status {response.status_code}")
+            return None
+
+    except Exception as e:
+        print(f"Warning: Failed to convert decklist: {e}")
+        return None
+
+def generate_want_lists(all_cards):
+    """Generate want lists in various formats for cards that are needed"""
+
+    # Group cards by set and filter for cards you don't have and aren't pending
+    want_lists = {}
+    for card in all_cards.values():
+        if not card.get('has_card') and not card.get('cardmarket_pending'):
+            set_name = card.get('set_name', 'Unknown Set')
+            if set_name not in want_lists:
+                want_lists[set_name] = []
+            want_lists[set_name].append(card)
+
+    # Generate different format files
+    formats = {
+        'simple': generate_simple_want_list,
+        'cardmarket': generate_cardmarket_want_list,
+        'decklist': generate_decklist_want_list,
+        'cardmarket_converted': generate_cardmarket_converted_want_list
+    }
+
+    for format_name, generator_func in formats.items():
+        filename = f"want_list_{format_name}.txt"
+        content = generator_func(want_lists)
+
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        total_cards = sum(len(cards) for cards in want_lists.values())
+        print(f"Want list generated: {filename} ({total_cards} cards)")
+
+def generate_simple_want_list(want_lists):
+    """Generate a simple list of card names by set"""
+    content = "# Pokemon Card Want List (Simple Format)\n"
+    content += f"# Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+
+    for set_name, cards in sorted(want_lists.items()):
+        if not cards:
+            continue
+
+        content += f"## {set_name}\n"
+        for card in sorted(cards, key=lambda x: (x.get('number', '999'), x.get('name', ''))):
+            number = card.get('number', '???')
+            name = card.get('name', 'Unknown')
+            variant = card.get('variant_type', 'Normal')
+            if variant != 'Normal':
+                content += f"{number} {name} ({variant})\n"
+            else:
+                content += f"{number} {name}\n"
+        content += "\n"
+
+    return content
+
+def generate_cardmarket_want_list(want_lists):
+    """Generate a list formatted for Cardmarket import (best guess format)"""
+    content = "# Pokemon Card Want List (Cardmarket Format)\n"
+    content += f"# Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    content += "# Format: Card Name [Set Code] (modify abilities manually if needed)\n\n"
+
+    all_cards = []
+    for set_name, cards in want_lists.items():
+        for card in cards:
+            set_code = card.get('set_code', 'UNK')
+            name = card.get('name', 'Unknown')
+            variant = card.get('variant_type', 'Normal')
+
+            # Format for Cardmarket - this is a best guess
+            if variant != 'Normal':
+                formatted_name = f"{name} ({variant}) [{set_code}]"
+            else:
+                formatted_name = f"{name} [{set_code}]"
+
+            all_cards.append((name, formatted_name, card))
+
+    # Sort alphabetically by card name
+    for name, formatted_name, card in sorted(all_cards, key=lambda x: x[0]):
+        content += f"{formatted_name}\n"
+
+    content += "\n# Note: You may need to manually add abilities in brackets like:\n"
+    content += "# Exeggcute [Precocious Evolution] [SSP]\n"
+    content += "# Durant ex [Sudden Shearing | Vengeful Crush] [SSP]\n"
+
+    return content
+
+def generate_decklist_want_list(want_lists):
+    """Generate a list in decklist format for pokedata.ovh converter"""
+    content = "# Pokemon Card Want List (Decklist Format for pokedata.ovh)\n"
+    content += f"# Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    content += "# Format: 1 CardName SetCode Number\n"
+    content += "# Use this with https://www.pokedata.ovh/misc/cardmarket\n\n"
+
+    # Collect all cards and sort them by set and number
+    all_want_cards = []
+    for set_name, cards in want_lists.items():
+        for card in cards:
+            all_want_cards.append(card)
+
+    # Sort by set code, then by number
+    sorted_cards = sorted(all_want_cards, key=lambda x: (x.get('set_code', 'ZZZ'), int(x.get('number', '999')) if x.get('number', '999').isdigit() else 999, x.get('name', '')))
+
+    for card in sorted_cards:
+        number = card.get('number', '???')
+        name = card.get('name', 'Unknown')
+        set_code = card.get('set_code', 'UNK')
+        variant = card.get('variant_type', 'Normal')
+
+        # Format exactly as the converter expects: "1 CardName SetCode Number"
+        if variant != 'Normal':
+            content += f"1 {name} ({variant}) {set_code} {number}\n"
+        else:
+            content += f"1 {name} {set_code} {number}\n"
+
+    content += "\n# Instructions:\n"
+    content += "# 1. Copy the list above\n"
+    content += "# 2. Paste into https://www.pokedata.ovh/misc/cardmarket\n"
+    content += "# 3. Click Convert to get Cardmarket format with abilities\n"
+
+    return content
+
+def generate_cardmarket_converted_want_list(want_lists):
+    """Generate a list automatically converted via pokedata.ovh API"""
+    content = "# Pokemon Card Want List (Auto-Converted via pokedata.ovh)\n"
+    content += f"# Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    content += "# Automatically converted with abilities included!\n\n"
+
+    # First generate the decklist format
+    decklist_content = ""
+    all_want_cards = []
+    for set_name, cards in want_lists.items():
+        for card in cards:
+            all_want_cards.append(card)
+
+    # Sort by set code, then by number (same as decklist format)
+    sorted_cards = sorted(all_want_cards, key=lambda x: (x.get('set_code', 'ZZZ'), int(x.get('number', '999')) if x.get('number', '999').isdigit() else 999, x.get('name', '')))
+
+    for card in sorted_cards:
+        number = card.get('number', '???')
+        name = card.get('name', 'Unknown')
+        set_code = card.get('set_code', 'UNK')
+        variant = card.get('variant_type', 'Normal')
+
+        # Format exactly as the converter expects: "1 CardName SetCode Number"
+        if variant != 'Normal':
+            decklist_content += f"1 {name} ({variant}) {set_code} {number}\n"
+        else:
+            decklist_content += f"1 {name} {set_code} {number}\n"
+
+    # Try to convert via the API
+    print("Converting decklist to Cardmarket format via pokedata.ovh...")
+    converted_text = convert_decklist_to_cardmarket(decklist_content)
+
+    if converted_text:
+        content += "# SUCCESS: Automatically converted with abilities!\n"
+        content += "# Copy the text below and paste directly into Cardmarket:\n\n"
+        content += converted_text
+        content += "\n\n# Note: This was automatically converted - abilities are included!"
+    else:
+        content += "# CONVERSION FAILED: Using manual format instead\n"
+        content += "# You may need to manually add abilities or try the pokedata.ovh converter\n\n"
+        content += "# Original decklist format (copy to https://www.pokedata.ovh/misc/cardmarket):\n"
+        content += decklist_content
+        content += "\n# Manual format (add abilities manually):\n"
+        for line in decklist_content.strip().split('\n'):
+            if line.strip():
+                # Extract card name and set code for manual format
+                parts = line.split()
+                if len(parts) >= 4:  # 1 CardName SetCode Number
+                    card_name = ' '.join(parts[1:-2])  # Everything between count and set code
+                    set_code = parts[-2]
+                    content += f"{card_name} [ABILITY] [{set_code}]\n"
+
+    return content
 
 if __name__ == "__main__":
     main()

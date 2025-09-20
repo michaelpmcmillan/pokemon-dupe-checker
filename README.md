@@ -8,6 +8,7 @@ A Python tool that helps you track your Pokemon card collection by analyzing sav
 - 🔍 **Card Preview**: Hover over camera icons to see card images
 - 📈 **Set Statistics**: Completion percentages and detailed breakdowns by set
 - 🎯 **Smart Sorting**: Sets ordered by completion percentage (owned + pending cards)
+- 🛒 **Cardmarket Want Lists**: Generate properly formatted want lists for cards you need
 - 📱 **Responsive Design**: Works great on desktop and mobile
 
 ## Setup
@@ -52,15 +53,22 @@ python3 extract_cards.py
 The script will:
 - Scan the `data` folder for TCG Collector and Cardmarket files
 - Extract card information and collection status
-- Generate HTML reports
+- Generate HTML reports and want list files
 
 ### Step 4: View Your Reports
 
-The script generates several HTML files:
+The script generates several files:
 
+**HTML Reports:**
 - **`index.html`** - Main overview page with all sets
-- **Individual set pages** (e.g., `Surging_Sparks.html`) - Detailed card lists per set
+- **Individual set pages** (e.g., `Surging_Sparks.html`) - Detailed card lists per set with want list generation
 - **`card_collection_report.html`** - Legacy single-page report
+
+**Want Lists:**
+- **`want_list_simple.txt`** - Simple card list format
+- **`want_list_cardmarket.txt`** - Basic Cardmarket format
+- **`want_list_decklist.txt`** - Decklist format for pokedata.ovh
+- **`want_list_cardmarket_converted.txt`** - Fully converted Cardmarket format with abilities
 
 Open `index.html` in your web browser to start exploring your collection!
 
@@ -78,10 +86,28 @@ Open `index.html` in your web browser to start exploring your collection!
 
 - **Detailed Card Lists**: Every card in the set with status indicators
 - **Card Preview**: Hover over 📷 icons to see card images (when available)
+- **Cardmarket Want Lists**: Generate properly formatted want lists for purchasing
 - **Status Indicators**:
   - ✓ = You own this card
   - ✗ = You need this card
   - Different row colors indicate card status
+
+### Cardmarket Want List Generation
+
+Each individual set page includes a "Generate Want List" feature that:
+
+- **Automatically converts** your needed cards to Cardmarket format
+- **Includes abilities** for each card (via pokedata.ovh API)
+- **Strips leading zeros** from card numbers (e.g., "049" becomes "49")
+- **Deduplicates variants** (one entry per card, regardless of holo/reverse holo)
+- **Splits large lists** into chunks of 150 cards (Cardmarket's limit)
+- **Provides copy buttons** for easy pasting into Cardmarket
+
+To use:
+1. Visit any individual set page (e.g., `Journey_Together.html`)
+2. Click "Generate Want List" in the blue section
+3. Wait for the API conversion to complete
+4. Copy the formatted text and paste directly into Cardmarket's want list
 
 ### Status Legend
 
@@ -96,9 +122,14 @@ pokemon-dupe-checker/
 ├── data/                          # Save web pages here
 │   ├── [TCG Collector pages].html
 │   └── [Cardmarket pages].html
+├── templates/                     # HTML/JS templates
+│   ├── set_page.html             # Individual set page template
+│   └── cardmarket.js             # Want list generation JavaScript
 ├── extract_cards.py              # Main script
+├── test_templates.py             # Template testing script
 ├── index.html                    # Generated overview report
 ├── [Set_Name].html               # Generated individual set reports
+├── want_list_*.txt               # Generated want lists (various formats)
 └── README.md                     # This file
 ```
 
