@@ -42,10 +42,10 @@ function generateCardmarketList() {
         // Create decklist format
         const setCode = '{{SET_CODE}}';
 
-        // Deduplicate cards by name (ignore variants)
+        // Deduplicate cards by name and number (ignore variants only)
         const uniqueCards = {};
         wantCards.forEach(card => {
-            const key = card.name + '_' + setCode;
+            const key = card.name + '_' + card.number + '_' + setCode;
             if (!uniqueCards[key]) {
                 uniqueCards[key] = card;
             }
