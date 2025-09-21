@@ -85,7 +85,7 @@ def run_extraction():
         print(f"Error during extraction: {e}")
         return False
 
-def run_report_generation():
+def run_report_generation(force_all=False):
     """Run the report generation process"""
     print("\n" + "=" * 60)
     print("PHASE 2: REPORT GENERATION")
@@ -94,7 +94,7 @@ def run_report_generation():
     # Import and run the report generation
     try:
         from generate_reports import main as reports_main
-        result = reports_main()
+        result = reports_main(force_all=force_all)
         if result != 0:
             print("Report generation failed!")
             return False
@@ -157,7 +157,9 @@ def main():
         print("Data extraction not needed (HTML files unchanged)")
 
     # Phase 2: Report Generation
-    if not run_report_generation():
+    # Force regeneration of all files if we just extracted new data
+    force_all_reports = needs_extraction
+    if not run_report_generation(force_all=force_all_reports):
         return 1
 
     print("\n" + "=" * 60)

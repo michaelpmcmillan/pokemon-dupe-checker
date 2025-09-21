@@ -7,6 +7,8 @@ Generates HTML reports from extracted card data
 import json
 import html
 import requests
+import os
+import glob
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -19,6 +21,45 @@ def load_data(filename="card_data.json"):
 
     with open(filename, 'r', encoding='utf-8') as f:
         return json.load(f)
+
+def get_sets_needing_regeneration(data, force_all=False):
+    """Determine which sets need HTML regeneration based on source file changes"""
+    if force_all:
+        return set()  # Empty set means regenerate all
+
+    source_files = data.get('source_files', {})
+    sets_to_regenerate = set()
+
+    # Check if any source files have been modified since extraction
+    for file_path, file_info in source_files.items():
+        if os.path.exists(file_path):
+            current_mtime = os.path.getmtime(file_path)
+            stored_mtime = file_info.get('mtime', 0)
+
+            # If file was modified after extraction, find which sets it affects
+            if current_mtime > stored_mtime:
+                file_name = os.path.basename(file_path)
+                print(f"File changed since extraction: {file_name}")
+
+                # Extract set name from TCG Collector filename patterns
+                if 'TCG Collector' in file_name:
+                    # Try to match common patterns like "Set Name card list (International TCG) – TCG Collector.html"
+                    if 'card list' in file_name:
+                        set_name = file_name.split(' card list')[0].strip()
+                        sets_to_regenerate.add(set_name)
+                        print(f"  -> Will regenerate set: {set_name}")
+
+    # Also check if any HTML files exist that weren't in the original source files
+    # (this handles newly added files)
+    current_html_files = set(glob.glob('data/*.html'))
+    tracked_files = set(source_files.keys())
+    new_files = current_html_files - tracked_files
+
+    if new_files:
+        print(f"Found {len(new_files)} new HTML files - will regenerate all sets")
+        return set()  # Regenerate all if new files found
+
+    return sets_to_regenerate
 
 def generate_individual_set_page(set_name, set_cards):
     """Generate individual set page with detailed card list using templates"""
@@ -544,7 +585,7 @@ def process_all_cards(data):
 
     return all_cards
 
-def main():
+def main(force_all=False):
     """Main report generation function"""
     print("Loading extracted card data...")
 
@@ -556,26 +597,34 @@ def main():
     print(f"- {data['stats']['total_tcg_cards']} TCG Collector cards")
     print(f"- {data['stats']['total_cardmarket_cards']} Cardmarket cards")
 
+    # Determine which sets need regeneration
+    sets_to_regenerate = get_sets_needing_regeneration(data, force_all)
+    regenerate_all = len(sets_to_regenerate) == 0 or force_all
+
+    if regenerate_all:
+        print("Regenerating all HTML files...")
+    else:
+        print(f"Selective regeneration for {len(sets_to_regenerate)} changed sets: {sets_to_regenerate}")
+
     # Process the data into the format needed for reports
     all_cards = process_all_cards(data)
 
     print("Generating HTML reports...")
 
-    # Generate the old single-page report (keep for compatibility)
+    # Always regenerate overview pages (they're fast and may depend on multiple sets)
     html_report = generate_legacy_report(all_cards)
     output_file = Path("card_collection_report.html")
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(html_report)
     print(f"Legacy report generated: {output_file}")
 
-    # Generate overview page
     overview_html = generate_set_overview_page(all_cards)
     overview_file = Path("index.html")
     with open(overview_file, 'w', encoding='utf-8') as f:
         f.write(overview_html)
     print(f"Overview page generated: {overview_file}")
 
-    # Generate individual set pages
+    # Generate individual set pages (selective or all)
     sets_by_name = {}
     for card in all_cards.values():
         set_name = card.get('set_name', 'Unknown')
@@ -583,7 +632,21 @@ def main():
             sets_by_name[set_name] = []
         sets_by_name[set_name].append(card)
 
+    sets_generated = 0
+    sets_skipped = 0
+
     for set_name, set_cards in sets_by_name.items():
+        # Check if this set needs regeneration
+        if not regenerate_all and set_name not in sets_to_regenerate:
+            # Check if HTML file exists, if not, we must generate it
+            safe_filename = set_name.replace(' ', '_').replace('&', 'and').replace("'", "").replace('.', '')
+            set_file = Path(f"{safe_filename}.html")
+            if set_file.exists():
+                sets_skipped += 1
+                continue
+            else:
+                print(f"Set HTML missing, generating: {set_name}")
+
         # Create safe filename for set
         safe_filename = set_name.replace(' ', '_').replace('&', 'and').replace("'", "").replace('.', '')
 
@@ -592,11 +655,14 @@ def main():
         with open(set_file, 'w', encoding='utf-8') as f:
             f.write(set_html)
         print(f"Set page generated: {set_file} ({len(set_cards)} cards)")
+        sets_generated += 1
 
-    print(f"\nGenerated {len(sets_by_name) + 1} HTML files:")
+    print(f"\nGenerated {2 + sets_generated} HTML files:")
     print(f"- index.html (overview)")
-    print(f"- {len(sets_by_name)} individual set pages")
     print(f"- card_collection_report.html (legacy single page)")
+    print(f"- {sets_generated} individual set pages")
+    if sets_skipped > 0:
+        print(f"- {sets_skipped} set pages skipped (unchanged)")
 
     # Generate want lists
     print(f"\nGenerating want lists...")
