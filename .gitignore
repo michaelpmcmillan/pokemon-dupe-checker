@@ -35,5 +35,8 @@ Thumbs.db
 # Generated want lists
 want_list_*.txt
 
+# Data cache (can be regenerated from HTML files)
+card_data.json
+
 # Test files (can be regenerated)
 test_template_output.html

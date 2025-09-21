@@ -8,20 +8,37 @@ A Python-based tool that analyzes saved HTML pages from TCG Collector and Cardma
 
 ## Architecture
 
-### Core Components
+### Core Components (Split Architecture)
 
-1. **extract_cards.py** - Main Python script that:
+1. **extract_cards.py** - Main orchestrator script that:
+   - Manages the two-phase workflow (extraction + report generation)
+   - Implements smart change detection using file timestamps
+   - Provides command-line options for different workflows
+   - Coordinates between data extraction and HTML generation phases
+
+2. **extract_data.py** - Data extraction module that:
    - Parses TCG Collector HTML pages for card data and collection status
    - Parses Cardmarket purchase pages for pending/purchased cards
+   - Saves structured data to `card_data.json` for caching
+   - Handles all HTML parsing and data normalization
+
+3. **generate_reports.py** - Report generation module that:
+   - Loads cached data from `card_data.json`
    - Generates HTML reports using template system
    - Creates various want list formats
+   - Handles all presentation logic and file output
 
-2. **Templates System** (`templates/` folder):
+4. **Templates System** (`templates/` folder):
    - **set_page.html** - Jinja2-style template for individual set pages
    - **cardmarket.js** - JavaScript for want list generation with CORS bypass
    - Uses `{{PLACEHOLDER}}` syntax for variable replacement
 
-3. **Generated Files**:
+5. **Data Cache**:
+   - **card_data.json** - Structured data cache with extraction metadata
+   - Enables fast report regeneration without re-parsing HTML
+   - Includes timestamps and file metadata for change detection
+
+6. **Generated Files**:
    - **index.html** - Main overview with all sets
    - **[Set_Name].html** - Individual set pages with detailed card lists
    - **want_list_*.txt** - Various want list formats
@@ -66,14 +83,53 @@ A Python-based tool that analyzes saved HTML pages from TCG Collector and Cardma
 - **Solution**: Added dynamic count display showing "X of Y cards" or "Showing all X cards"
 - **Implementation**: JavaScript updates count in real-time as filters change
 
+### Split Architecture for Performance
+- **Problem**: HTML parsing was slow (minutes), making development cycles painful
+- **Solution**: Separated data extraction from report generation with JSON caching
+- **Benefits**:
+  - Data extraction: Only runs when HTML files change (smart timestamp detection)
+  - Report generation: Fast regeneration (seconds) for template/UI changes
+  - Development workflow: Use `--reports-only` for rapid iteration
+- **Implementation**: Three-file architecture with orchestrator pattern
+
 ## Important Code Patterns
 
 ### Template Variable Replacement
 ```python
-# In extract_cards.py
+# In generate_reports.py
 html_content = html_template.replace('{{SET_NAME}}', html.escape(set_name))
 html_content = html_content.replace('{{SET_CODE}}', html.escape(set_code))
 html_content = html_content.replace('{{COMPLETION_PERCENT}}', f"{completion_percent:.1f}")
+```
+
+### Data Cache Management
+```python
+# In extract_data.py - Save structured data
+def save_data(data, filename="card_data.json"):
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+# In generate_reports.py - Load cached data
+def load_card_data(filename="card_data.json"):
+    with open(filename, 'r', encoding='utf-8') as f:
+        return json.load(f)
+```
+
+### Smart Change Detection
+```python
+# In extract_cards.py - Check if re-extraction is needed
+def needs_reextraction():
+    data_file = Path('card_data.json')
+    if not data_file.exists():
+        return True
+
+    data_mtime = data_file.stat().st_mtime
+    html_files = glob.glob('data/*.html')
+
+    for html_file in html_files:
+        if os.path.getmtime(html_file) > data_mtime:
+            return True
+    return False
 ```
 
 ### CORS Proxy Usage
@@ -205,12 +261,27 @@ python3 extract_cards.py
 ```
 Processes all data files and regenerates everything.
 
+### Performance Testing
+```bash
+# Test data extraction only
+python3 extract_cards.py --extract
+
+# Test report generation only (fast)
+python3 extract_cards.py --reports-only
+
+# Check current data status
+python3 extract_cards.py --info
+```
+
 ## File Structure
 
 ```
 pokemon-dupe-checker/
-├── extract_cards.py              # Main script
+├── extract_cards.py              # Main orchestrator script
+├── extract_data.py               # Data extraction from HTML files
+├── generate_reports.py           # HTML report generation
 ├── test_templates.py             # Template testing
+├── card_data.json                # Extracted data cache (auto-generated)
 ├── templates/
 │   ├── set_page.html             # Set page template
 │   └── cardmarket.js             # Want list JavaScript
@@ -233,14 +304,16 @@ pokemon-dupe-checker/
 - Log detailed errors to console for debugging
 
 ### Performance
-- Process files efficiently (don't re-read unnecessarily)
+- Use split architecture: extract data only when HTML files change
+- Cache structured data in JSON for fast report regeneration
+- Use `--reports-only` for rapid development iteration
 - Use chunking for large datasets
 - Cache API responses when possible
 
 ## Troubleshooting
 
 ### "No cards found" Issues
-- Check HTML parsing logic in `extract_tcg_collector_cards()`
+- Check HTML parsing logic in `extract_tcg_collector_cards()` (in extract_data.py)
 - Verify saved pages are in "List" view, not "Grid" view
 - Ensure complete page saves (not just HTML source)
 
@@ -285,19 +358,31 @@ pokemon-dupe-checker/
 ## Quick Reference Commands
 
 ```bash
-# Regenerate everything
+# Full workflow (smart: only extracts if HTML files changed)
 python3 extract_cards.py
+
+# Fast report regeneration (seconds instead of minutes)
+python3 extract_cards.py --reports-only
+
+# Force data re-extraction (when troubleshooting)
+python3 extract_cards.py --extract
+
+# Check current data status
+python3 extract_cards.py --info
 
 # Test templates only
 python3 test_templates.py
 
 # Check generated files
-ls -la *.html want_list_*.txt
+ls -la *.html want_list_*.txt card_data.json
 
-# Clean generated files
+# Clean generated files (keeps data cache)
 rm *.html want_list_*.txt test_template_output.html
+
+# Clean everything including cache (forces full re-extraction)
+rm *.html want_list_*.txt card_data.json test_template_output.html
 ```
 
 ---
 
-*Last updated: Session that implemented filter-aware want list generation, visible card count display, and improved UX flow*
+*Last updated: Session that implemented split architecture for performance optimization (extract_data.py, generate_reports.py, orchestrator pattern with smart change detection)*

@@ -53,8 +53,34 @@ python3 extract_cards.py
 
 The script will:
 - Scan the `data` folder for TCG Collector and Cardmarket files
-- Extract card information and collection status
+- Extract card information and collection status (only if HTML files changed)
 - Generate HTML reports and want list files
+
+#### Performance Options
+
+For faster development and testing, you can use these additional commands:
+
+- **Fast mode** (skip data extraction if HTML files unchanged):
+  ```bash
+  python3 extract_cards.py
+  ```
+
+- **Reports only** (regenerate HTML quickly without re-parsing data):
+  ```bash
+  python3 extract_cards.py --reports-only
+  ```
+
+- **Force extraction** (re-parse all HTML files even if unchanged):
+  ```bash
+  python3 extract_cards.py --extract
+  ```
+
+- **Show data info** (check current extracted data status):
+  ```bash
+  python3 extract_cards.py --info
+  ```
+
+The system automatically detects when HTML files have changed and only re-extracts data when necessary, making subsequent runs much faster (seconds instead of minutes).
 
 ### Step 4: View Your Reports
 
@@ -165,8 +191,11 @@ pokemon-dupe-checker/
 ├── templates/                     # HTML/JS templates
 │   ├── set_page.html             # Individual set page template
 │   └── cardmarket.js             # Want list generation JavaScript
-├── extract_cards.py              # Main script
+├── extract_cards.py              # Main orchestrator script
+├── extract_data.py               # Data extraction from HTML files
+├── generate_reports.py           # HTML report generation
 ├── test_templates.py             # Template testing script
+├── card_data.json                # Extracted data cache (auto-generated)
 ├── index.html                    # Generated overview report
 ├── [Set_Name].html               # Generated individual set reports
 ├── want_list_*.txt               # Generated want lists (various formats)
@@ -187,7 +216,8 @@ pokemon-dupe-checker/
 
 ### Running the Script
 - Re-run the script whenever you add new data files
-- The script processes all files in the `data` folder each time
+- The script automatically detects changes and only re-processes when needed
+- Use `--reports-only` for quick HTML regeneration during development
 - Generated HTML files are automatically updated
 
 ## Troubleshooting
