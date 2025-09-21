@@ -125,6 +125,14 @@
             </select>
         </div>
         <div class="filter-group">
+            <label for="rarityFilter">Rarity:</label>
+            <select id="rarityFilter" onchange="filterTable()">
+                <option value="All">All</option>
+                <option value="Base Set">Base Set Only</option>
+                <option value="Secret Rare">Secret Rare Only</option>
+            </select>
+        </div>
+        <div class="filter-group">
             <label for="searchBox">Search:</label>
             <input type="text" id="searchBox" placeholder="Card name..." onkeyup="filterTable()">
         </div>
@@ -173,19 +181,76 @@
         filterTable();
     };
 
+    function calculateBaseSetSize(rows) {
+        // Find the largest card number that appears with multiple variants
+        // This indicates it's part of the base set (since secret rares typically don't have variants)
+        var cardCounts = {};
+
+        for (var i = 1; i < rows.length; i++) {
+            var cells = rows[i].getElementsByTagName("td");
+            var cardNumber = parseInt(cells[1].textContent);
+            var cardName = cells[3].textContent;
+
+            if (!isNaN(cardNumber)) {
+                var key = cardNumber + "_" + cardName;
+                cardCounts[key] = (cardCounts[key] || 0) + 1;
+            }
+        }
+
+        // Find the largest number that has multiple variants (normal + reverse holo)
+        var largestBaseCard = 0;
+        for (var key in cardCounts) {
+            if (cardCounts[key] > 1) {
+                var cardNumber = parseInt(key.split("_")[0]);
+                if (cardNumber > largestBaseCard) {
+                    largestBaseCard = cardNumber;
+                }
+            }
+        }
+
+        // If no cards with variants found, use a reasonable default based on common set sizes
+        if (largestBaseCard === 0) {
+            // Look for gaps in numbering that might indicate secret rare boundary
+            var allNumbers = [];
+            for (var i = 1; i < rows.length; i++) {
+                var cells = rows[i].getElementsByTagName("td");
+                var cardNumber = parseInt(cells[1].textContent);
+                if (!isNaN(cardNumber)) {
+                    allNumbers.push(cardNumber);
+                }
+            }
+            allNumbers.sort((a, b) => a - b);
+
+            // Find the largest number under 300 (reasonable set size limit)
+            for (var j = allNumbers.length - 1; j >= 0; j--) {
+                if (allNumbers[j] <= 300) {
+                    largestBaseCard = allNumbers[j];
+                    break;
+                }
+            }
+        }
+
+        return largestBaseCard || 198; // Default to 198 if calculation fails
+    }
+
     function filterTable() {
         var statusFilter = document.getElementById("statusFilter").value;
         var variantFilter = document.getElementById("variantFilter").value;
+        var rarityFilter = document.getElementById("rarityFilter").value;
         var searchBox = document.getElementById("searchBox").value.toLowerCase();
         var table = document.getElementById("cardTable");
         var rows = table.getElementsByTagName("tr");
 
-        // First pass: apply status and search filters
+        // Calculate base set size (largest card number that appears frequently)
+        var baseSetSize = calculateBaseSetSize(rows);
+
+        // First pass: apply status, search, and rarity filters
         var visibleRows = [];
         for (var i = 1; i < rows.length; i++) {
             var row = rows[i];
             var cells = row.getElementsByTagName("td");
             var cardName = cells[3].textContent.toLowerCase();
+            var cardNumber = parseInt(cells[1].textContent);
             var status = cells[6].textContent;
 
             var showRow = true;
@@ -197,6 +262,13 @@
 
             // Filter by search
             if (searchBox !== "" && !cardName.includes(searchBox)) {
+                showRow = false;
+            }
+
+            // Filter by rarity (base set vs secret rare)
+            if (rarityFilter === "Base Set" && cardNumber > baseSetSize) {
+                showRow = false;
+            } else if (rarityFilter === "Secret Rare" && cardNumber <= baseSetSize) {
                 showRow = false;
             }
 
