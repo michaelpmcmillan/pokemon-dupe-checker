@@ -561,27 +561,21 @@ def process_all_cards(data):
 
     # Add Cardmarket cards, checking for duplicates
     for card in cm_cards:
-        # For Cardmarket cards, we'll check against both Normal and Reverse Holo variants
-        normal_key = f"{card.get('set_code', 'UNK')}_{card.get('number', 'XXX')}_Normal"
-        reverse_key = f"{card.get('set_code', 'UNK')}_{card.get('number', 'XXX')}_Reverse Holo"
+        # Create the exact key for this specific variant
+        card_variant = card.get('variant_type', 'Normal')
+        card_key = f"{card.get('set_code', 'UNK')}_{card.get('number', 'XXX')}_{card_variant}"
 
-        found_duplicate = False
-
-        # Check if we already have this card in any variant
-        for existing_key in [normal_key, reverse_key]:
-            if existing_key in all_cards:
-                # Mark existing card as having pending purchase
-                all_cards[existing_key]['status'] = 'pending_purchase'
-                all_cards[existing_key]['cardmarket_pending'] = True
-                found_duplicate = True
-                break
-
-        if not found_duplicate:
-            # New card from Cardmarket - it already has the right structure
+        # Check if we already have this exact variant
+        if card_key in all_cards:
+            # Mark existing card as having pending purchase
+            all_cards[card_key]['status'] = 'pending_purchase'
+            all_cards[card_key]['cardmarket_pending'] = True
+        else:
+            # New card from Cardmarket - add it with pending status
             card['status'] = 'pending_purchase'
             card['cardmarket_pending'] = True
             # card already has variant_type and has_card set correctly
-            all_cards[normal_key] = card
+            all_cards[card_key] = card
 
     return all_cards
 

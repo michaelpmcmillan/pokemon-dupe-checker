@@ -184,17 +184,21 @@ def extract_cardmarket_cards(html_content):
     cards = []
 
     # Updated pattern for new Cardmarket HTML structure
-    # Look for table rows with data attributes containing card info
-    tr_pattern = r'<tr[^>]*data-name="([^"]*)"[^>]*data-expansion-name="([^"]*)"[^>]*data-number="([^"]*)"[^>]*>(.*?)</tr>'
-    tr_matches = re.findall(tr_pattern, html_content, re.IGNORECASE | re.DOTALL)
+    # Look for full table rows containing td elements with card links in format "CardName (SET NUM)"
+    # This captures both the card info AND the full row content for variant detection
+    row_pattern = r'<tr[^>]*>(.*?<td[^>]*class="(?:info|name[^"]*)"[^>]*>.*?<a[^>]*>([^<]*\([A-Z]+\s+\d+\))</a>.*?)</tr>'
+    row_matches = re.findall(row_pattern, html_content, re.IGNORECASE | re.DOTALL)
 
-    for match in tr_matches:
-        card_name_raw, set_name_raw, card_number_raw, tr_content = match
+    for row_content, card_text in row_matches:
+        # Parse the card text in format "CardName (SET NUM)"
+        # Extract card name and the (SET NUM) pattern
+        card_match = re.match(r'^(.*?)\s*\(([A-Z]+)\s+(\d+)\)$', card_text.strip())
+        if not card_match:
+            continue
 
-        # Clean up the extracted data
-        card_name = html.unescape(card_name_raw.strip())
-        set_name = html.unescape(set_name_raw.strip())
-        card_number = card_number_raw.strip()
+        card_name = html.unescape(card_match.group(1).strip())
+        set_code = card_match.group(2).strip()
+        card_number = card_match.group(3).strip()
 
         # Skip empty card names
         if not card_name:
@@ -202,19 +206,13 @@ def extract_cardmarket_cards(html_content):
 
         # Determine variant type by looking for "Reverse Holo" in the row content
         variant_type = 'Normal'
-        if 'Reverse Holo' in tr_content:
+        if 'Reverse Holo' in row_content:
             variant_type = 'Reverse Holo'
-        elif 'Holo' in tr_content and 'Reverse Holo' not in tr_content:
+        elif 'Holo' in row_content and 'Reverse Holo' not in row_content:
             variant_type = 'Holo'
 
-        # Try to extract set code from the content (like "SVI" from "SVI 037")
-        # Look for patterns like (SET 123) in links
-        set_code_match = re.search(r'\(([A-Z]+)\s+\d+\)', tr_content)
-        if set_code_match:
-            set_code = set_code_match.group(1)
-        else:
-            # Fallback: try to derive from set name
-            set_code = set_name.replace(' ', '').replace('&', '')[:3].upper()
+        # Use set code as-is, no need for mapping
+        set_name = f'Set {set_code}'
 
         card = {
             'name': card_name,
@@ -294,7 +292,14 @@ def extract_all_data():
     # Update Cardmarket cards with proper set names
     for card in all_cm_cards:
         set_code = card.get('set_code')
-        if set_code and set_code in set_mapping:
+        set_name = card.get('set_name')
+
+        # Special handling for McDonald's sets - map different variations to the correct TCG set
+        if set_name and "McDonald's Dragon Discovery" in set_name:
+            # Map all McDonald's Dragon Discovery variations to the TCG version
+            card['set_code'] = 'M24'
+            card['set_name'] = "McDonald's Dragon Discovery 2024"
+        elif set_code and set_code in set_mapping:
             card['set_name'] = set_mapping[set_code]
 
     # Get source file information for change detection
