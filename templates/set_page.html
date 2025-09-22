@@ -22,7 +22,14 @@
         }
         .progress-fill {
             height: 100%;
+            display: flex;
+            transition: width 0.3s ease;
+        }
+        .progress-owned {
             background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+        }
+        .progress-pending {
+            background: linear-gradient(90deg, #6c757d 0%, #495057 100%);
         }
         .filters { margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; }
         .filter-group { display: inline-block; margin-right: 20px; }
@@ -81,7 +88,10 @@
         <p><strong>Set Code:</strong> {{SET_CODE}}</p>
 
         <div class="progress-bar">
-            <div class="progress-fill" style="width: {{COMPLETION_PERCENT}}%"></div>
+            <div class="progress-fill" style="width: {{TOTAL_PROGRESS_PERCENT}}%">
+                <div class="progress-owned" style="width: {{OWNED_PERCENT_OF_TOTAL}}%"></div>
+                <div class="progress-pending" style="width: {{PENDING_PERCENT_OF_TOTAL}}%"></div>
+            </div>
         </div>
 
         <div class="set-stats">

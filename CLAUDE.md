@@ -92,6 +92,25 @@ A Python-based tool that analyzes saved HTML pages from TCG Collector and Cardma
   - Development workflow: Use `--reports-only` for rapid iteration
 - **Implementation**: Three-file architecture with orchestrator pattern
 
+### Cardmarket HTML Structure Changes (2025 A/B Testing)
+- **Problem**: Cardmarket changed HTML structure, breaking extraction (0 cards extracted)
+- **Old Pattern**: Used `data-name`, `data-expansion-name`, `data-number` attributes
+- **New Pattern**: Card data in `<td class="info">` and `<td class="name">` elements with format "CardName (SET NUM)"
+- **Solution**: Updated regex to match actual table structure, extract set codes directly from content
+- **Implementation**: `extract_data.py:189` - captures full table rows for variant detection
+
+### Variant-Specific Deduplication
+- **Problem**: Deduplication matched across different variants (Normal vs Reverse Holo)
+- **Example**: Chansey (TWM 133) Reverse Holo marked as "Need" when Normal variant was pending
+- **Solution**: Match exact variants using `{set_code}_{number}_{variant}` keys
+- **Implementation**: `generate_reports.py:564-578` - precise variant matching instead of cross-matching
+
+### Progress Bar Consistency
+- **Problem**: Set pages had simple green progress bars, index.html had green+gray segments
+- **Solution**: Added pending (gray) segments to all set page progress bars
+- **Implementation**: Updated `templates/set_page.html` with two-segment progress bars matching index.html style
+- **Visual**: Shows both owned (green) and pending purchase (gray) progress in all views
+
 ## Important Code Patterns
 
 ### Template Variable Replacement
@@ -130,6 +149,34 @@ def needs_reextraction():
         if os.path.getmtime(html_file) > data_mtime:
             return True
     return False
+```
+
+### Updated Cardmarket Extraction Pattern
+```python
+# In extract_data.py - Updated HTML parsing for 2025 structure
+row_pattern = r'<tr[^>]*>(.*?<td[^>]*class="(?:info|name[^"]*)"[^>]*>.*?<a[^>]*>([^<]*\([A-Z]+\s+\d+\))</a>.*?)</tr>'
+row_matches = re.findall(row_pattern, html_content, re.IGNORECASE | re.DOTALL)
+
+for row_content, card_text in row_matches:
+    # Parse "CardName (SET NUM)" format
+    card_match = re.match(r'^(.*?)\s*\(([A-Z]+)\s+(\d+)\)$', card_text.strip())
+    set_code = card_match.group(2)  # Extract directly, no hardcoded mappings
+
+    # Detect variants from full row content
+    if 'Reverse Holo' in row_content:
+        variant_type = 'Reverse Holo'
+```
+
+### Variant-Specific Deduplication Logic
+```python
+# In generate_reports.py - Exact variant matching
+for card in cm_cards:
+    card_variant = card.get('variant_type', 'Normal')
+    card_key = f"{card.get('set_code', 'UNK')}_{card.get('number', 'XXX')}_{card_variant}"
+
+    if card_key in all_cards:
+        # Mark EXACT variant as pending
+        all_cards[card_key]['status'] = 'pending_purchase'
 ```
 
 ### CORS Proxy Usage
@@ -317,6 +364,19 @@ pokemon-dupe-checker/
 - Verify saved pages are in "List" view, not "Grid" view
 - Ensure complete page saves (not just HTML source)
 
+### Cardmarket Extraction Issues (2025+)
+- **Symptom**: 0 Cardmarket cards extracted despite files being present
+- **Cause**: Cardmarket changed HTML structure (A/B testing)
+- **Check**: Look for `<td class="info">` or `<td class="name">` elements with "CardName (SET NUM)" format
+- **Fix**: Update regex pattern in `extract_data.py:189` to match current structure
+- **Verification**: Test with `grep -o -E 'class="(?:info|name[^"]*)".*\([A-Z]+ [0-9]+\)' data/Purchase*.html`
+
+### Variant Deduplication Issues
+- **Symptom**: Cards showing "Need" when different variant is pending (e.g., RH vs Normal)
+- **Cause**: Deduplication matching across variants instead of exact variants
+- **Fix**: Ensure `{set_code}_{number}_{variant}` key format in `generate_reports.py:565`
+- **Test**: Check specific card like "Chansey (TWM 133) Reverse Holo" shows "Pending Purchase"
+
 ### Want List Generation Failures
 - Check browser network tab for CORS/proxy issues
 - Verify API response format in `templates/cardmarket.js`
@@ -385,4 +445,25 @@ rm *.html want_list_*.txt card_data.json test_template_output.html
 
 ---
 
-*Last updated: Session that implemented split architecture for performance optimization (extract_data.py, generate_reports.py, orchestrator pattern with smart change detection)*
+*Last updated: Session that fixed Cardmarket extraction breaking changes, variant-specific deduplication, and progress bar consistency across all views (2025-09-22)*
+
+## Recent Major Fixes (2025-09-22)
+
+### Cardmarket Extraction Crisis Resolution
+- **Issue**: Cardmarket website A/B testing broke extraction completely (0 cards → 1331 cards)
+- **Root Cause**: Changed from `data-*` attributes to `<td class="info/name">` structure
+- **Fix**: Complete rewrite of extraction pattern to match "CardName (SET NUM)" format
+- **Impact**: Tool now reliably extracts all pending purchases from Cardmarket orders
+
+### Deduplication Accuracy Improvement
+- **Issue**: Cross-variant matching caused incorrect "Need" status for owned variants
+- **Example**: Chansey (TWM 133) RH showing "Need" when Normal variant pending
+- **Fix**: Exact variant matching using composite keys
+- **Impact**: Perfect accuracy in duplicate detection across Normal/Reverse Holo/Holo variants
+
+### UI Consistency Enhancement
+- **Issue**: Progress bars inconsistent between overview and set pages
+- **Fix**: Added pending (gray) segments to all set page progress bars
+- **Impact**: Uniform visual representation of owned vs pending cards across all views
+
+These fixes resolved critical reliability issues making the tool production-ready for accurate collection tracking and duplicate detection.

@@ -2,6 +2,8 @@
 
 A Python tool that helps you track your Pokemon card collection by analyzing saved web pages from TCG Collector and Cardmarket, then generating beautiful HTML reports showing your collection progress.
 
+> **✅ Recently Updated (Sept 2025)**: Fixed critical Cardmarket extraction issues caused by website changes, improved duplicate detection accuracy, and enhanced UI consistency. The tool is now reliable and production-ready!
+
 ## Features
 
 - 📊 **Visual Progress Tracking**: Two-color progress bars showing owned cards (green) and pending purchases (gray)

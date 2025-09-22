@@ -139,6 +139,14 @@ def generate_individual_set_page(set_name, set_cards):
     # Replace placeholders in JavaScript template
     js_code = js_template.replace('{{SET_CODE}}', set_code)
 
+    # Calculate progress bar percentages
+    pending_percent = (pending_cards / total_cards * 100) if total_cards > 0 else 0
+    total_progress_percent = completion_percent + pending_percent
+
+    # Calculate percentages within the progress bar (owned vs pending)
+    owned_percent_of_total = (completion_percent / total_progress_percent * 100) if total_progress_percent > 0 else 0
+    pending_percent_of_total = (pending_percent / total_progress_percent * 100) if total_progress_percent > 0 else 0
+
     # Replace placeholders in HTML template
     html_content = html_template.replace('{{SET_NAME}}', html.escape(set_name))
     html_content = html_content.replace('{{SET_CODE}}', html.escape(set_code))
@@ -146,6 +154,9 @@ def generate_individual_set_page(set_name, set_cards):
     html_content = html_content.replace('{{OWNED_CARDS}}', str(owned_cards))
     html_content = html_content.replace('{{PENDING_CARDS}}', str(pending_cards))
     html_content = html_content.replace('{{COMPLETION_PERCENT}}', f"{completion_percent:.1f}")
+    html_content = html_content.replace('{{TOTAL_PROGRESS_PERCENT}}', f"{total_progress_percent:.1f}")
+    html_content = html_content.replace('{{OWNED_PERCENT_OF_TOTAL}}', f"{owned_percent_of_total:.1f}")
+    html_content = html_content.replace('{{PENDING_PERCENT_OF_TOTAL}}', f"{pending_percent_of_total:.1f}")
     html_content = html_content.replace('{{CARD_ROWS}}', card_rows_html)
     html_content = html_content.replace('{{CARDMARKET_JS}}', js_code)
 
