@@ -218,7 +218,7 @@ def extract_cardmarket_cards(html_content):
             'name': card_name,
             'source': 'cardmarket',
             'variant_type': variant_type,
-            'has_card': False,  # Cardmarket cards are pending purchase, not owned yet
+            'has_card': False,  # Cardmarket cards are pending delivery, not owned yet
             'set_code': set_code,
             'number': card_number.zfill(3) if card_number else None,  # Pad with zeros to match TCG format
             'set_name': set_name

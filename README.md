@@ -6,7 +6,7 @@ A Python tool that helps you track your Pokemon card collection by analyzing sav
 
 ## Features
 
-- 📊 **Visual Progress Tracking**: Two-color progress bars showing owned cards (green) and pending purchases (gray)
+- 📊 **Visual Progress Tracking**: Two-color progress bars showing owned cards (green) and pending deliveries (gray)
 - 🔍 **Card Preview**: Hover over camera icons to see card images
 - 📈 **Set Statistics**: Completion percentages and detailed breakdowns by set
 - 🎯 **Smart Sorting**: Sets ordered by completion percentage (owned + pending cards)
@@ -107,7 +107,7 @@ Open `index.html` in your web browser to start exploring your collection!
 
 - **Overall Statistics**: Total cards tracked, owned, pending, and completion percentage
 - **Set Grid**: Each set shows:
-  - Progress bar with green (owned) and gray (pending purchase) sections
+  - Progress bar with green (owned) and gray (pending delivery) sections
   - Completion statistics
   - Link to detailed set page
 
@@ -180,7 +180,7 @@ This workflow allows you to create separate want lists for different variants, m
 ### Status Legend
 
 - **Green rows**: Cards you own
-- **Gray rows**: Cards with pending purchases
+- **Gray rows**: Cards with pending deliveries
 - **White rows**: Cards you still need
 
 ## File Organization

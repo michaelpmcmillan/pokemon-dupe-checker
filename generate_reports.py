@@ -113,13 +113,13 @@ def generate_individual_set_page(set_name, set_cards):
         # Determine status
         if card.get('has_card'):
             if card.get('cardmarket_pending'):
-                status = 'Have + Pending Purchase (Duplicate!)'
+                status = 'Have + Pending Delivery (Duplicate!)'
                 row_class = 'has-card'  # Still color as owned since they have it
             else:
                 status = 'Have'
                 row_class = 'has-card'
         elif card.get('cardmarket_pending'):
-            status = 'Pending Purchase'
+            status = 'Pending Delivery'
             row_class = 'pending'
         else:
             status = 'Need'
@@ -274,7 +274,7 @@ def generate_set_overview_page(all_cards):
             </div>
             <div class="stat-box">
                 <div class="stat-number">{total_pending}</div>
-                <div class="stat-label">Pending Purchase</div>
+                <div class="stat-label">Pending Delivery</div>
             </div>
             <div class="stat-box">
                 <div class="stat-number">{((total_owned / total_cards) * 100):.1f}%</div>
@@ -313,7 +313,7 @@ def generate_set_overview_page(all_cards):
             <div class="set-stats">
                 <strong>{stats['owned_cards']}</strong> of <strong>{stats['total_cards']}</strong> cards owned
                 (<strong>{completion_percent:.1f}%</strong> complete)
-                {f'<br><strong>{stats["pending_cards"]}</strong> cards pending purchase ({pending_percent:.1f}%)' if stats['pending_cards'] > 0 else ''}
+                {f'<br><strong>{stats["pending_cards"]}</strong> cards pending delivery ({pending_percent:.1f}%)' if stats['pending_cards'] > 0 else ''}
             </div>
 
             <a href="{safe_filename}.html" class="set-link">View Set Details →</a>
@@ -578,7 +578,7 @@ def process_all_cards(data):
 
         # Check if we already have this exact variant
         if card_key in all_cards:
-            # Mark existing card as having pending purchase
+            # Mark existing card as having pending delivery
             all_cards[card_key]['status'] = 'pending_purchase'
             all_cards[card_key]['cardmarket_pending'] = True
         else:

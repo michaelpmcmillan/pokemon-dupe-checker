@@ -109,7 +109,7 @@ A Python-based tool that analyzes saved HTML pages from TCG Collector and Cardma
 - **Problem**: Set pages had simple green progress bars, index.html had green+gray segments
 - **Solution**: Added pending (gray) segments to all set page progress bars
 - **Implementation**: Updated `templates/set_page.html` with two-segment progress bars matching index.html style
-- **Visual**: Shows both owned (green) and pending purchase (gray) progress in all views
+- **Visual**: Shows both owned (green) and pending delivery (gray) progress in all views
 
 ## Important Code Patterns
 
@@ -175,8 +175,8 @@ for card in cm_cards:
     card_key = f"{card.get('set_code', 'UNK')}_{card.get('number', 'XXX')}_{card_variant}"
 
     if card_key in all_cards:
-        # Mark EXACT variant as pending
-        all_cards[card_key]['status'] = 'pending_purchase'
+        # Mark EXACT variant as pending delivery
+        all_cards[card_key]['status'] = 'pending_delivery'
 ```
 
 ### CORS Proxy Usage
@@ -375,7 +375,7 @@ pokemon-dupe-checker/
 - **Symptom**: Cards showing "Need" when different variant is pending (e.g., RH vs Normal)
 - **Cause**: Deduplication matching across variants instead of exact variants
 - **Fix**: Ensure `{set_code}_{number}_{variant}` key format in `generate_reports.py:565`
-- **Test**: Check specific card like "Chansey (TWM 133) Reverse Holo" shows "Pending Purchase"
+- **Test**: Check specific card like "Chansey (TWM 133) Reverse Holo" shows "Pending Delivery"
 
 ### Want List Generation Failures
 - Check browser network tab for CORS/proxy issues
@@ -453,11 +453,11 @@ rm *.html want_list_*.txt card_data.json test_template_output.html
 - **Issue**: Cardmarket website A/B testing broke extraction completely (0 cards → 1331 cards)
 - **Root Cause**: Changed from `data-*` attributes to `<td class="info/name">` structure
 - **Fix**: Complete rewrite of extraction pattern to match "CardName (SET NUM)" format
-- **Impact**: Tool now reliably extracts all pending purchases from Cardmarket orders
+- **Impact**: Tool now reliably extracts all pending deliveries from Cardmarket orders
 
 ### Deduplication Accuracy Improvement
 - **Issue**: Cross-variant matching caused incorrect "Need" status for owned variants
-- **Example**: Chansey (TWM 133) RH showing "Need" when Normal variant pending
+- **Example**: Chansey (TWM 133) RH showing "Need" when Normal variant pending delivery
 - **Fix**: Exact variant matching using composite keys
 - **Impact**: Perfect accuracy in duplicate detection across Normal/Reverse Holo/Holo variants
 
