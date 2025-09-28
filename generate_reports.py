@@ -261,10 +261,7 @@ def generate_set_overview_page(all_cards):
             sets_by_name[set_name] = []
         sets_by_name[set_name].append(card)
 
-    # Calculate overall statistics using new metrics
-    overall_metrics = calculate_completion_metrics(list(all_cards.values()))
-
-    # Calculate set-specific statistics with enhanced metrics
+    # Calculate set-specific statistics with enhanced metrics first
     set_stats = {}
     for set_name, cards in sets_by_name.items():
         set_code = cards[0].get('set_code', 'UNK') if cards else 'UNK'
@@ -274,6 +271,21 @@ def generate_set_overview_page(all_cards):
             'set_code': set_code,
             'metrics': metrics
         }
+
+    # Calculate overall statistics by summing individual set metrics
+    overall_metrics = {
+        'all_cards': {'total': 0, 'owned': 0, 'pending': 0},
+        'standard_set': {'total': 0, 'owned': 0, 'pending': 0},
+        'standard_normal': {'total': 0, 'owned': 0, 'pending': 0},
+        'standard_reverse': {'total': 0, 'owned': 0, 'pending': 0},
+        'secret_cards': {'total': 0, 'owned': 0, 'pending': 0}
+    }
+
+    for set_data in set_stats.values():
+        for metric_type in overall_metrics:
+            overall_metrics[metric_type]['total'] += set_data['metrics'][metric_type]['total']
+            overall_metrics[metric_type]['owned'] += set_data['metrics'][metric_type]['owned']
+            overall_metrics[metric_type]['pending'] += set_data['metrics'][metric_type]['pending']
 
     html_content = f"""<!DOCTYPE html>
 <html>

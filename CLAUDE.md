@@ -467,3 +467,4 @@ rm *.html want_list_*.txt card_data.json test_template_output.html
 - **Impact**: Uniform visual representation of owned vs pending cards across all views
 
 These fixes resolved critical reliability issues making the tool production-ready for accurate collection tracking and duplicate detection.
+- Avoid at all costs hardcoding any data.  Set codes, card numbers, etc should always come from the source data - the tcgcollector html files.
