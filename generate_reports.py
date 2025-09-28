@@ -102,8 +102,26 @@ def generate_individual_set_page(set_name, set_cards):
         total_count = card.get('total_count') or ''
         name = card.get('name', 'Unknown')
         variant = card.get('variant_type', 'Normal')
-        rarity = card.get('rarity') or 'Unknown'
+        rarity_data = card.get('rarity_data')
         card_id = card.get('card_id')
+
+        # Process rarity data into HTML
+        rarity_html = ''
+        if rarity_data:
+            if isinstance(rarity_data, dict):
+                if 'src' in rarity_data and 'title' in rarity_data:
+                    # Display image with alt text
+                    rarity_html = f'<img src="{html.escape(rarity_data["src"])}" alt="{html.escape(rarity_data["title"])}" title="{html.escape(rarity_data["title"])}" style="height: 16px; width: auto;">'
+                elif 'text' in rarity_data:
+                    # Fallback to text (for cases like energies that don't use images)
+                    rarity_html = html.escape(rarity_data['text'])
+                else:
+                    rarity_html = 'Unknown'
+            else:
+                # Handle legacy single string format (backward compatibility)
+                rarity_html = html.escape(str(rarity_data))
+        else:
+            rarity_html = 'Unknown'
 
         # Create camera icon HTML if card has an ID
         camera_icon_html = ''
@@ -134,7 +152,7 @@ def generate_individual_set_page(set_name, set_cards):
                 <td>{html.escape(total_count)}</td>
                 <td>{html.escape(name)}</td>
                 <td>{html.escape(variant)}</td>
-                <td>{html.escape(rarity)}</td>
+                <td>{rarity_html}</td>
                 <td>{have}</td>
                 <td>{status}</td>
             </tr>'''
