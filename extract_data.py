@@ -255,8 +255,8 @@ def extract_all_data():
     # Find all Cardmarket HTML files
     cm_files = list(data_dir.glob("*Cardmarket*.html"))
     if not cm_files:
-        print("No Cardmarket HTML files found in data/ folder")
-        return None
+        print("No Cardmarket HTML files found in data/ folder (orders delivered/removed)")
+        cm_files = []  # Continue with empty list instead of returning None
 
     print(f"Found {len(tcg_files)} TCG Collector files and {len(cm_files)} Cardmarket files")
 
@@ -275,14 +275,17 @@ def extract_all_data():
 
     # Process all Cardmarket files
     all_cm_cards = []
-    for cm_file in cm_files:
-        print(f"Reading Cardmarket file: {cm_file.name}")
-        with open(cm_file, 'r', encoding='utf-8') as f:
-            cm_content = f.read()
+    if cm_files:
+        for cm_file in cm_files:
+            print(f"Reading Cardmarket file: {cm_file.name}")
+            with open(cm_file, 'r', encoding='utf-8') as f:
+                cm_content = f.read()
 
-        cm_cards = extract_cardmarket_cards(cm_content)
-        all_cm_cards.extend(cm_cards)
-        print(f"  Found {len(cm_cards)} cards")
+            cm_cards = extract_cardmarket_cards(cm_content)
+            all_cm_cards.extend(cm_cards)
+            print(f"  Found {len(cm_cards)} cards")
+    else:
+        print("No Cardmarket files to process")
 
     print(f"Total Cardmarket cards: {len(all_cm_cards)}")
 
