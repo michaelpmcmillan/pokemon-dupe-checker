@@ -32,6 +32,60 @@ def extract_set_info_from_tcg_collector(html_content):
 
     return None, None
 
+def extract_card_rarity(html_content, card):
+    """Extract rarity information for a specific card"""
+    rarity = None
+
+    # First, try to find rarity using card_id if available
+    if card.get('card_id'):
+        card_id = card['card_id']
+
+        # Look for rarity within a reasonable distance after the card_id
+        # Use a more specific pattern that ensures we're matching the title of the rarity symbol
+        rarity_search_pattern = rf'data-card-id="{card_id}".*?<img[^>]*title="([^"]*)"[^>]*class="[^"]*card-rarity-symbol[^"]*"'
+        rarity_match = re.search(rarity_search_pattern, html_content, re.DOTALL | re.IGNORECASE)
+
+        if not rarity_match:
+            # Try alternative order: class before title
+            rarity_search_pattern = rf'data-card-id="{card_id}".*?<img[^>]*class="[^"]*card-rarity-symbol[^"]*"[^>]*title="([^"]*)"'
+            rarity_match = re.search(rarity_search_pattern, html_content, re.DOTALL | re.IGNORECASE)
+
+        if rarity_match:
+            rarity = html.unescape(rarity_match.group(1).strip())
+        else:
+            # Check for M24-style text rarity (— symbol)
+            text_rarity_pattern = rf'data-card-id="{card_id}".*?<div[^>]*class="[^"]*card-list-item-rarity[^"]*".*?<span[^>]*class="[^"]*card-list-item-entry-text[^"]*"[^>]*>([^<]+)</span>'
+            text_match = re.search(text_rarity_pattern, html_content, re.DOTALL | re.IGNORECASE)
+
+            if text_match:
+                text_content = html.unescape(text_match.group(1).strip())
+                # Handle M24 special case: — symbol means no rarity
+                if text_content == '—':
+                    rarity = None
+                else:
+                    rarity = text_content
+
+    # Fallback: try to find rarity by card name and number context
+    if rarity is None and card.get('name') and card.get('number'):
+        name = card['name']
+        number = card['number']
+
+        # Create a broader search pattern around the card name and number
+        context_pattern = rf'{re.escape(name)}.*?{re.escape(number)}.*?<img[^>]*class="[^"]*card-rarity-symbol[^"]*"[^>]*title="([^"]*)"'
+        context_match = re.search(context_pattern, html_content, re.DOTALL | re.IGNORECASE)
+
+        if context_match:
+            rarity = html.unescape(context_match.group(1).strip())
+        else:
+            # Try reverse order (rarity might come before name/number)
+            reverse_pattern = rf'<img[^>]*class="[^"]*card-rarity-symbol[^"]*"[^>]*title="([^"]*)".*?{re.escape(name)}.*?{re.escape(number)}'
+            reverse_match = re.search(reverse_pattern, html_content, re.DOTALL | re.IGNORECASE)
+
+            if reverse_match:
+                rarity = html.unescape(reverse_match.group(1).strip())
+
+    return rarity
+
 def extract_tcg_collector_cards(html_content):
     """Extract card data from TCG Collector HTML"""
     cards = []
@@ -170,11 +224,15 @@ def extract_tcg_collector_cards(html_content):
                         'has_card': False
                     })
 
+        # Extract rarity for this card
+        rarity = extract_card_rarity(html_content, card)
+
         # Create a card entry for each variant
         for variant in variants:
             variant_card = card.copy()
             variant_card['variant_type'] = variant['type']
             variant_card['has_card'] = variant['has_card']
+            variant_card['rarity'] = rarity  # Add rarity to each variant
             cards.append(variant_card)
 
     return cards

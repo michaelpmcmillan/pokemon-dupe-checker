@@ -102,6 +102,7 @@ def generate_individual_set_page(set_name, set_cards):
         total_count = card.get('total_count') or ''
         name = card.get('name', 'Unknown')
         variant = card.get('variant_type', 'Normal')
+        rarity = card.get('rarity') or 'Unknown'
         card_id = card.get('card_id')
 
         # Create camera icon HTML if card has an ID
@@ -133,6 +134,7 @@ def generate_individual_set_page(set_name, set_cards):
                 <td>{html.escape(total_count)}</td>
                 <td>{html.escape(name)}</td>
                 <td>{html.escape(variant)}</td>
+                <td>{html.escape(rarity)}</td>
                 <td>{have}</td>
                 <td>{status}</td>
             </tr>'''

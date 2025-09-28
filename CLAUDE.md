@@ -445,9 +445,20 @@ rm *.html want_list_*.txt card_data.json test_template_output.html
 
 ---
 
-*Last updated: Session that fixed Cardmarket extraction breaking changes, variant-specific deduplication, and progress bar consistency across all views (2025-09-22)*
+*Last updated: Session that fixed secret card metrics calculation bug (2025-09-28)*
 
-## Recent Major Fixes (2025-09-22)
+## Recent Major Fixes (2025-09-28)
+
+### Secret Card Metrics Calculation Bug Resolution
+- **Issue**: "Secret cards only" filter showed wildly incorrect counts (714 owned, 168 pending instead of 4 owned, 0 pending)
+- **Root Cause**: Overall metrics calculated by treating all cards from all sets as single set, using first `total_count` found
+- **Problem**: Each set has different `total_count` values (e.g., MEW=165, WHT=86) for determining secret cards (cards numbered above set limit)
+- **Fix**: Calculate metrics per set individually first, then sum up to get accurate overall totals
+- **Implementation**: Modified `generate_set_overview_page()` in `generate_reports.py:264-288`
+- **Impact**: Secret card filter now shows correct counts: 1055 total, 4 owned, 0 pending across all sets
+- **Key Learning**: When aggregating metrics across multiple datasets with different rules, always calculate per-dataset first then sum
+
+### Previous Major Fixes (2025-09-22)
 
 ### Cardmarket Extraction Crisis Resolution
 - **Issue**: Cardmarket website A/B testing broke extraction completely (0 cards → 1331 cards)

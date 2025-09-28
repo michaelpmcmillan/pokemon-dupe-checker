@@ -42,10 +42,11 @@
         th:nth-child(1), td:nth-child(1) { width: 8%; }  /* Preview */
         th:nth-child(2), td:nth-child(2) { width: 10%; } /* Card Number */
         th:nth-child(3), td:nth-child(3) { width: 8%; }  /* Total */
-        th:nth-child(4), td:nth-child(4) { width: 40%; } /* Card Name */
-        th:nth-child(5), td:nth-child(5) { width: 15%; } /* Variant */
-        th:nth-child(6), td:nth-child(6) { width: 8%; }  /* Have */
-        th:nth-child(7), td:nth-child(7) { width: 11%; } /* Status */
+        th:nth-child(4), td:nth-child(4) { width: 35%; } /* Card Name */
+        th:nth-child(5), td:nth-child(5) { width: 13%; } /* Variant */
+        th:nth-child(6), td:nth-child(6) { width: 10%; } /* Rarity */
+        th:nth-child(7), td:nth-child(7) { width: 8%; }  /* Have */
+        th:nth-child(8), td:nth-child(8) { width: 8%; }  /* Status */
         th { background-color: #f2f2f2; cursor: pointer; }
         th:hover { background-color: #e9ecef; }
         .has-card { background-color: #d4edda; }
@@ -176,8 +177,9 @@
                 <th onclick="sortTable(2)">Total</th>
                 <th onclick="sortTable(3)">Card Name</th>
                 <th onclick="sortTable(4)">Variant</th>
-                <th onclick="sortTable(5)">Have</th>
-                <th onclick="sortTable(6)">Status</th>
+                <th onclick="sortTable(5)">Rarity</th>
+                <th onclick="sortTable(6)">Have</th>
+                <th onclick="sortTable(7)">Status</th>
             </tr>
         </thead>
         <tbody>

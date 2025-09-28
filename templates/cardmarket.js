@@ -20,8 +20,8 @@ function generateCardmarketList() {
             const cells = row.getElementsByTagName('td');
 
             // Only process visible rows that need cards
-            if (row.style.display !== 'none' && cells.length >= 7) {
-                const status = cells[6].textContent;
+            if (row.style.display !== 'none' && cells.length >= 8) {
+                const status = cells[7].textContent;
                 if (status === 'Need') {
                     const cardData = {
                         number: cells[1].textContent,
