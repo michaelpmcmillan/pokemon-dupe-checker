@@ -9,6 +9,7 @@ import html
 import requests
 import os
 import glob
+import re
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -162,6 +163,94 @@ def generate_individual_set_page(set_name, set_cards):
 
     return html_content
 
+def calculate_completion_metrics(cards):
+    """Calculate various completion metrics for a set of cards"""
+    if not cards:
+        return {
+            'all_cards': {'total': 0, 'owned': 0, 'pending': 0},
+            'standard_set': {'total': 0, 'owned': 0, 'pending': 0},
+            'standard_normal': {'total': 0, 'owned': 0, 'pending': 0},
+            'standard_reverse': {'total': 0, 'owned': 0, 'pending': 0},
+            'secret_cards': {'total': 0, 'owned': 0, 'pending': 0}
+        }
+
+    # Determine the standard set size from total_count
+    total_count = None
+    for card in cards:
+        if card.get('total_count'):
+            total_count = int(card['total_count'])
+            break
+
+    if total_count is None:
+        # Fallback: assume all cards are standard if no total_count available
+        total_count = float('inf')
+
+    # Initialize metrics
+    metrics = {
+        'all_cards': {'total': 0, 'owned': 0, 'pending': 0},
+        'standard_set': {'total': 0, 'owned': 0, 'pending': 0},
+        'standard_normal': {'total': 0, 'owned': 0, 'pending': 0},
+        'standard_reverse': {'total': 0, 'owned': 0, 'pending': 0},
+        'secret_cards': {'total': 0, 'owned': 0, 'pending': 0}
+    }
+
+    # Analyze each card
+    for card in cards:
+        is_owned = card.get('has_card', False)
+        is_pending = card.get('cardmarket_pending', False)
+        variant_type = card.get('variant_type', 'Normal')
+
+        try:
+            card_number = int(card.get('number', '0'))
+        except (ValueError, TypeError):
+            card_number = 0
+
+        is_standard = card_number <= total_count
+        is_secret = card_number > total_count
+        is_normal = variant_type == 'Normal'
+        is_reverse = variant_type == 'Reverse Holo'
+
+        # All cards
+        metrics['all_cards']['total'] += 1
+        if is_owned:
+            metrics['all_cards']['owned'] += 1
+        if is_pending:
+            metrics['all_cards']['pending'] += 1
+
+        # Standard set (all variants)
+        if is_standard:
+            metrics['standard_set']['total'] += 1
+            if is_owned:
+                metrics['standard_set']['owned'] += 1
+            if is_pending:
+                metrics['standard_set']['pending'] += 1
+
+        # Standard set - Normal variants only
+        if is_standard and is_normal:
+            metrics['standard_normal']['total'] += 1
+            if is_owned:
+                metrics['standard_normal']['owned'] += 1
+            if is_pending:
+                metrics['standard_normal']['pending'] += 1
+
+        # Standard set - Reverse Holo variants only
+        if is_standard and is_reverse:
+            metrics['standard_reverse']['total'] += 1
+            if is_owned:
+                metrics['standard_reverse']['owned'] += 1
+            if is_pending:
+                metrics['standard_reverse']['pending'] += 1
+
+        # Secret cards
+        if is_secret:
+            metrics['secret_cards']['total'] += 1
+            if is_owned:
+                metrics['secret_cards']['owned'] += 1
+            if is_pending:
+                metrics['secret_cards']['pending'] += 1
+
+    return metrics
+
 def generate_set_overview_page(all_cards):
     """Generate the main overview page with all sets"""
     # Group cards by set
@@ -172,23 +261,18 @@ def generate_set_overview_page(all_cards):
             sets_by_name[set_name] = []
         sets_by_name[set_name].append(card)
 
-    # Calculate overall statistics
-    total_cards = len(all_cards)
-    total_owned = sum(1 for card in all_cards.values() if card.get('has_card'))
-    total_pending = sum(1 for card in all_cards.values() if card.get('cardmarket_pending'))
+    # Calculate overall statistics using new metrics
+    overall_metrics = calculate_completion_metrics(list(all_cards.values()))
 
-    # Calculate set-specific statistics
+    # Calculate set-specific statistics with enhanced metrics
     set_stats = {}
     for set_name, cards in sets_by_name.items():
         set_code = cards[0].get('set_code', 'UNK') if cards else 'UNK'
-        owned_cards = sum(1 for card in cards if card.get('has_card'))
-        pending_cards = sum(1 for card in cards if card.get('cardmarket_pending'))
+        metrics = calculate_completion_metrics(cards)
 
         set_stats[set_name] = {
             'set_code': set_code,
-            'total_cards': len(cards),
-            'owned_cards': owned_cards,
-            'pending_cards': pending_cards
+            'metrics': metrics
         }
 
     html_content = f"""<!DOCTYPE html>
@@ -256,28 +340,158 @@ def generate_set_overview_page(all_cards):
         .stat-box {{ text-align: center; padding: 15px; background: white; border-radius: 8px; }}
         .stat-number {{ font-size: 24px; font-weight: bold; color: #007bff; }}
         .stat-label {{ font-size: 14px; color: #666; }}
+        .metric-selector {{
+            background: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }}
+        .metric-selector label {{
+            font-weight: bold;
+            color: #333;
+            font-size: 16px;
+        }}
+        .metric-selector select {{
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background: white;
+            min-width: 250px;
+        }}
+        .metric-selector select:focus {{
+            outline: none;
+            border-color: #007bff;
+        }}
+        .metric-description {{
+            color: #666;
+            font-size: 14px;
+            font-style: italic;
+            margin-left: auto;
+        }}
     </style>
+    <script>
+        // Store all metrics data for dynamic switching
+        const overallMetrics = PLACEHOLDER_OVERALL_METRICS;
+        const setMetrics = PLACEHOLDER_SET_METRICS;
+
+        // Current metric selection
+        let currentMetric = 'all_cards';
+
+        // Descriptions for each metric
+        const metricDescriptions = {{
+            'all_cards': 'All cards including secret cards and both variants',
+            'standard_set': 'Cards #1 to set limit, both Normal and Reverse Holo',
+            'standard_normal': 'Standard set cards, Normal variant only',
+            'standard_reverse': 'Alternate set cards, Reverse Holo variant only',
+            'secret_cards': 'Standard set secret cards (numbered above set limit)'
+        }};
+
+        function updateMetricView() {{
+            const selector = document.getElementById('metricSelector');
+            currentMetric = selector.value;
+
+            // Update description
+            document.getElementById('metricDescription').textContent = metricDescriptions[currentMetric];
+
+            // Update overall statistics
+            updateOverallStats();
+
+            // Update all set cards
+            updateSetCards();
+        }}
+
+        function updateOverallStats() {{
+            const metrics = overallMetrics[currentMetric];
+
+            document.getElementById('totalCards').textContent = metrics.total;
+            document.getElementById('totalOwned').textContent = metrics.owned;
+            document.getElementById('totalPending').textContent = metrics.pending;
+
+            const completionPercent = metrics.total > 0 ? (metrics.owned / metrics.total * 100).toFixed(1) : 0;
+            document.getElementById('completionPercent').textContent = completionPercent + '%';
+        }}
+
+        function updateSetCards() {{
+            for (const [setName, stats] of Object.entries(setMetrics)) {{
+                const metrics = stats.metrics[currentMetric];
+                const setCard = document.getElementById('set-' + setName.replace(/[^a-zA-Z0-9]/g, ''));
+
+                if (!setCard) continue;
+
+                const completionPercent = metrics.total > 0 ? (metrics.owned / metrics.total * 100) : 0;
+                const pendingPercent = metrics.total > 0 ? (metrics.pending / metrics.total * 100) : 0;
+                const totalPercent = completionPercent + pendingPercent;
+
+                // Update progress bar
+                const progressFill = setCard.querySelector('.progress-fill');
+                const progressOwned = setCard.querySelector('.progress-owned');
+                const progressPending = setCard.querySelector('.progress-pending');
+
+                progressFill.style.width = totalPercent + '%';
+
+                if (totalPercent > 0) {{
+                    progressOwned.style.width = (completionPercent / totalPercent * 100) + '%';
+                    progressPending.style.width = (pendingPercent / totalPercent * 100) + '%';
+                }} else {{
+                    progressOwned.style.width = '0%';
+                    progressPending.style.width = '0%';
+                }}
+
+                // Update statistics text
+                const statsDiv = setCard.querySelector('.set-stats');
+                let statsText = `<strong>${{metrics.owned}}</strong> of <strong>${{metrics.total}}</strong> cards owned (<strong>${{completionPercent.toFixed(1)}}%</strong> complete)`;
+
+                if (metrics.pending > 0) {{
+                    statsText += `<br><strong>${{metrics.pending}}</strong> cards pending delivery (${{pendingPercent.toFixed(1)}}%)`;
+                }}
+
+                statsDiv.innerHTML = statsText;
+            }}
+        }}
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {{
+            updateMetricView();
+        }});
+    </script>
 </head>
 <body>
     <h1>Pokemon Card Collection Overview</h1>
+
+    <div class="metric-selector">
+        <label for="metricSelector">View Mode:</label>
+        <select id="metricSelector" onchange="updateMetricView()">
+            <option value="all_cards">All Cards</option>
+            <option value="standard_set">Standard Set</option>
+            <option value="standard_normal">Standard Set - Normal Only</option>
+            <option value="standard_reverse">Alternate Set - Reverse Holos Only</option>
+            <option value="secret_cards">Standard Set - Secret Cards Only</option>
+        </select>
+        <div id="metricDescription" class="metric-description">All cards including secret cards and both variants</div>
+    </div>
 
     <div class="overview-stats">
         <h2>Overall Collection Statistics</h2>
         <div class="overall-stats">
             <div class="stat-box">
-                <div class="stat-number">{total_cards}</div>
+                <div id="totalCards" class="stat-number">0</div>
                 <div class="stat-label">Total Cards Tracked</div>
             </div>
             <div class="stat-box">
-                <div class="stat-number">{total_owned}</div>
+                <div id="totalOwned" class="stat-number">0</div>
                 <div class="stat-label">Cards Owned</div>
             </div>
             <div class="stat-box">
-                <div class="stat-number">{total_pending}</div>
+                <div id="totalPending" class="stat-number">0</div>
                 <div class="stat-label">Pending Delivery</div>
             </div>
             <div class="stat-box">
-                <div class="stat-number">{((total_owned / total_cards) * 100):.1f}%</div>
+                <div id="completionPercent" class="stat-number">0%</div>
                 <div class="stat-label">Collection Complete</div>
             </div>
         </div>
@@ -286,20 +500,24 @@ def generate_set_overview_page(all_cards):
     <h2>Sets</h2>
     <div class="set-grid">"""
 
-    # Sort sets by completion percentage (owned + pending) / total (descending)
+    # Sort sets by all_cards completion percentage (owned + pending) / total (descending)
     sorted_sets = sorted(set_stats.items(),
-                        key=lambda x: (x[1]['owned_cards'] + x[1]['pending_cards']) / x[1]['total_cards'] if x[1]['total_cards'] > 0 else 0,
+                        key=lambda x: (x[1]['metrics']['all_cards']['owned'] + x[1]['metrics']['all_cards']['pending']) / x[1]['metrics']['all_cards']['total']
+                        if x[1]['metrics']['all_cards']['total'] > 0 else 0,
                         reverse=True)
 
     for set_name, stats in sorted_sets:
-        completion_percent = (stats['owned_cards'] / stats['total_cards'] * 100) if stats['total_cards'] > 0 else 0
-        pending_percent = (stats['pending_cards'] / stats['total_cards'] * 100) if stats['total_cards'] > 0 else 0
+        # Use all_cards metrics for initial display (will be updated by JavaScript)
+        metrics = stats['metrics']['all_cards']
+        completion_percent = (metrics['owned'] / metrics['total'] * 100) if metrics['total'] > 0 else 0
+        pending_percent = (metrics['pending'] / metrics['total'] * 100) if metrics['total'] > 0 else 0
 
-        # Create safe filename for set
+        # Create safe filename and ID for set
         safe_filename = set_name.replace(' ', '_').replace('&', 'and').replace("'", "").replace('.', '')
+        safe_id = re.sub(r'[^a-zA-Z0-9]', '', set_name)  # Remove all non-alphanumeric chars for ID
 
         html_content += f"""
-        <div class="set-card">
+        <div class="set-card" id="set-{safe_id}">
             <div class="set-title">{html.escape(set_name)}</div>
             <div class="set-code">Set Code: {html.escape(stats['set_code'])}</div>
 
@@ -311,9 +529,9 @@ def generate_set_overview_page(all_cards):
             </div>
 
             <div class="set-stats">
-                <strong>{stats['owned_cards']}</strong> of <strong>{stats['total_cards']}</strong> cards owned
+                <strong>{metrics['owned']}</strong> of <strong>{metrics['total']}</strong> cards owned
                 (<strong>{completion_percent:.1f}%</strong> complete)
-                {f'<br><strong>{stats["pending_cards"]}</strong> cards pending delivery ({pending_percent:.1f}%)' if stats['pending_cards'] > 0 else ''}
+                {f'<br><strong>{metrics["pending"]}</strong> cards pending delivery ({pending_percent:.1f}%)' if metrics['pending'] > 0 else ''}
             </div>
 
             <a href="{safe_filename}.html" class="set-link">View Set Details →</a>
@@ -323,6 +541,10 @@ def generate_set_overview_page(all_cards):
     </div>
 </body>
 </html>"""
+
+    # Inject the actual data into JavaScript placeholders
+    html_content = html_content.replace('PLACEHOLDER_OVERALL_METRICS', json.dumps(overall_metrics))
+    html_content = html_content.replace('PLACEHOLDER_SET_METRICS', json.dumps(set_stats))
 
     return html_content
 
