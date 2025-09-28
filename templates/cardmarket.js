@@ -57,9 +57,6 @@ function generateCardmarketList() {
             return '1 ' + card.name + ' ' + setCode + ' ' + cardNumber;
         });
 
-        // Try CORS proxy (DDOS protection might be off now)
-        statusElement.textContent = 'Testing API conversion...';
-
         // Split into chunks of 150 cards (Cardmarket limit)
         const chunkSize = 150;
         const chunks = [];
@@ -67,55 +64,66 @@ function generateCardmarketList() {
             chunks.push(decklistLines.slice(i, i + chunkSize));
         }
 
-        // Test with first chunk only to see if proxy works now
-        const testChunk = chunks[0].join('\n');
+        // Process all chunks
+        const uniqueCardCount = Object.keys(uniqueCards).length;
 
-        fetch('https://corsproxy.io/?' + encodeURIComponent('https://www.pokedata.ovh/misc/cardmarket'), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-GB,en;q=0.5',
-                'Origin': 'https://www.pokedata.ovh',
-                'Referer': 'https://www.pokedata.ovh/misc/cardmarket'
-            },
-            body: 'decklist=' + encodeURIComponent(testChunk)
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
-            }
-            return response.text();
-        })
-        .then(html => {
-            // Check if we got the form page or actual conversion
-            const textareaMatch = html.match(/<textarea[^>]*id="cardmarket"[^>]*>(.*?)<\/textarea>/s);
-            if (textareaMatch && textareaMatch[1].trim()) {
-                // Success! Show converted result
-                statusElement.textContent = 'API conversion successful!';
-                const convertedText = textareaMatch[1].trim();
+        if (chunks.length === 1) {
+            // Single chunk - try API conversion
+            statusElement.textContent = 'Testing API conversion...';
+            const chunk = chunks[0].join('\n');
 
-                const outputHtml = '<h4>Cardmarket Want List (' + wantCards.length + ' cards)</h4>' +
-                    '<p style="color: #28a745; margin-bottom: 15px;">✅ Automatically converted with abilities included!</p>' +
-                    '<div style="position: relative;">' +
-                    '<textarea readonly style="width: 100%; height: 200px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' + convertedText + '</textarea>' +
-                    '<button onclick="copyToClipboard(this.previousElementSibling.value)" style="position: absolute; top: 5px; right: 5px; padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Copy</button>' +
-                    '</div>';
+            fetch('https://corsproxy.io/?' + encodeURIComponent('https://www.pokedata.ovh/misc/cardmarket'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-GB,en;q=0.5',
+                    'Origin': 'https://www.pokedata.ovh',
+                    'Referer': 'https://www.pokedata.ovh/misc/cardmarket'
+                },
+                body: 'decklist=' + encodeURIComponent(chunk)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.text();
+            })
+            .then(html => {
+                // Check if we got the form page or actual conversion
+                const textareaMatch = html.match(/<textarea[^>]*id="cardmarket"[^>]*>(.*?)<\/textarea>/s);
+                if (textareaMatch && textareaMatch[1].trim()) {
+                    // Success! Show converted result
+                    statusElement.textContent = 'API conversion successful!';
+                    const convertedText = textareaMatch[1].trim();
 
-                outputElement.innerHTML = outputHtml;
-                outputElement.style.display = 'block';
-            } else {
-                throw new Error('No converted text found');
-            }
-        })
-        .catch(error => {
-            // Fallback to manual conversion
-            console.log('API conversion failed, showing manual format:', error);
-            statusElement.textContent = 'API failed, using manual conversion format';
+                    const outputHtml = '<h4>Cardmarket Want List (' + uniqueCardCount + ' cards)</h4>' +
+                        '<p style="color: #28a745; margin-bottom: 15px;">✅ Automatically converted with abilities included!</p>' +
+                        '<div style="position: relative;">' +
+                        '<textarea readonly style="width: 100%; height: 200px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' + convertedText + '</textarea>' +
+                        '<button onclick="copyToClipboard(this.previousElementSibling.value)" style="position: absolute; top: 5px; right: 5px; padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Copy</button>' +
+                        '</div>';
 
-            const uniqueCardCount = Object.keys(uniqueCards).length;
-            const outputHtml = '<h4>Manual Conversion Required (' + uniqueCardCount + ' unique cards)</h4>' +
+                    outputElement.innerHTML = outputHtml;
+                    outputElement.style.display = 'block';
+                } else {
+                    throw new Error('No converted text found');
+                }
+            })
+            .catch(error => {
+                // Fallback to manual conversion for single chunk
+                console.log('API conversion failed, showing manual format:', error);
+                showManualConversion();
+            });
+        } else {
+            // Multiple chunks - skip API and show manual conversion with chunks
+            statusElement.textContent = 'Multiple chunks needed (>150 cards), using manual format';
+            showManualConversionWithChunks();
+        }
+
+        function showManualConversion() {
+            const outputHtml = '<h4>Manual Conversion Required (' + uniqueCardCount + ' cards)</h4>' +
                 '<p style="margin-bottom: 15px;">API conversion failed. Copy the decklist below and convert it manually:</p>' +
                 '<div style="margin-bottom: 15px; padding: 15px; background-color: #e7f3ff; border-radius: 5px; border-left: 4px solid #007bff;">' +
                 '<strong>📋 Step 1:</strong> Copy the decklist below<br>' +
@@ -131,7 +139,32 @@ function generateCardmarketList() {
 
             outputElement.innerHTML = outputHtml;
             outputElement.style.display = 'block';
-        });
+        }
+
+        function showManualConversionWithChunks() {
+            let outputHtml = '<h4>Multiple Want Lists Required (' + uniqueCardCount + ' cards total)</h4>' +
+                '<p style="margin-bottom: 15px; color: #dc3545;"><strong>⚠️ Important:</strong> Cardmarket limits want lists to 150 cards. Your filtered selection has been split into ' + chunks.length + ' separate lists.</p>' +
+                '<div style="margin-bottom: 15px; padding: 15px; background-color: #e7f3ff; border-radius: 5px; border-left: 4px solid #007bff;">' +
+                '<strong>📋 Step 1:</strong> Copy each decklist below (one at a time)<br>' +
+                '<strong>🔗 Step 2:</strong> <a href="https://www.pokedata.ovh/misc/cardmarket" target="_blank" style="color: #007bff; font-weight: bold;">Open pokedata.ovh converter</a><br>' +
+                '<strong>📝 Step 3:</strong> Paste each decklist and click "Convert"<br>' +
+                '<strong>✅ Step 4:</strong> Copy each result to separate Cardmarket want lists' +
+                '</div>';
+
+            // Add each chunk as a separate panel
+            chunks.forEach((chunk, index) => {
+                const chunkText = chunk.join('\n');
+                outputHtml += '<div style="margin-bottom: 20px; border: 1px solid #ddd; border-radius: 5px; overflow: hidden;">' +
+                    '<div style="background-color: #f8f9fa; padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold;">Want List ' + (index + 1) + ' of ' + chunks.length + ' (' + chunk.length + ' cards)</div>' +
+                    '<div style="position: relative; padding: 0;">' +
+                    '<textarea readonly style="width: 100%; height: 150px; font-family: monospace; font-size: 12px; padding: 10px; border: none; resize: vertical;">' + chunkText + '</textarea>' +
+                    '<button onclick="copyToClipboard(this.previousElementSibling.value)" style="position: absolute; top: 5px; right: 5px; padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">📋 Copy List ' + (index + 1) + '</button>' +
+                    '</div></div>';
+            });
+
+            outputElement.innerHTML = outputHtml;
+            outputElement.style.display = 'block';
+        }
 
     } catch (error) {
         console.error('Error generating want list:', error);
