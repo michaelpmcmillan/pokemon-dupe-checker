@@ -263,7 +263,7 @@
             var cells = row.getElementsByTagName("td");
             var cardName = cells[3].textContent.toLowerCase();
             var cardNumber = parseInt(cells[1].textContent);
-            var status = cells[6].textContent;
+            var status = cells[7].textContent;
 
             var showRow = true;
 
@@ -308,7 +308,7 @@
                 var cardName = cells[3].textContent;
                 var cardNumber = cells[1].textContent;
                 var variant = cells[4].textContent;
-                var status = cells[6].textContent;
+                var status = cells[7].textContent;
                 var hasCard = status === "Have" || status === "Have + Pending Purchase (Duplicate!)";
 
                 var key = cardName + "_" + cardNumber;
