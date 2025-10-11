@@ -122,8 +122,8 @@
                 <option value="All">All</option>
                 <option value="Have">Have</option>
                 <option value="Need">Need</option>
-                <option value="Pending Purchase">Pending Purchase</option>
-                <option value="Have + Pending Purchase (Duplicate!)">Have + Pending Purchase (Duplicate!)</option>
+                <option value="Pending Delivery">Pending Delivery</option>
+                <option value="Have + Pending Delivery (Duplicate!)">Have + Pending Delivery (Duplicate!)</option>
             </select>
         </div>
         <div class="filter-group">
@@ -309,7 +309,7 @@
                 var cardNumber = cells[1].textContent;
                 var variant = cells[4].textContent;
                 var status = cells[7].textContent;
-                var hasCard = status === "Have" || status === "Have + Pending Purchase (Duplicate!)";
+                var hasCard = status === "Have" || status === "Have + Pending Delivery (Duplicate!)";
 
                 var key = cardName + "_" + cardNumber;
 
