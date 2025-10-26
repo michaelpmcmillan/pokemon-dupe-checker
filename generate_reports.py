@@ -449,6 +449,9 @@ def generate_set_overview_page(all_cards):
         }}
 
         function updateSetCards() {{
+            // Collect all set data with their metrics and DOM elements
+            const setData = [];
+
             for (const [setName, stats] of Object.entries(setMetrics)) {{
                 const metrics = stats.metrics[currentMetric];
                 const setCard = document.getElementById('set-' + setName.replace(/[^a-zA-Z0-9]/g, ''));
@@ -458,6 +461,38 @@ def generate_set_overview_page(all_cards):
                 const completionPercent = metrics.total > 0 ? (metrics.owned / metrics.total * 100) : 0;
                 const pendingPercent = metrics.total > 0 ? (metrics.pending / metrics.total * 100) : 0;
                 const totalPercent = completionPercent + pendingPercent;
+
+                setData.push({{
+                    setName: setName,
+                    metrics: metrics,
+                    completionPercent: completionPercent,
+                    pendingPercent: pendingPercent,
+                    totalPercent: totalPercent,
+                    element: setCard
+                }});
+            }}
+
+            // Sort by completion percentage (descending), then by set name (alphabetically)
+            setData.sort((a, b) => {{
+                if (b.completionPercent !== a.completionPercent) {{
+                    return b.completionPercent - a.completionPercent;
+                }}
+                return a.setName.localeCompare(b.setName);
+            }});
+
+            // Reorder DOM elements
+            const setGrid = document.querySelector('.set-grid');
+            setData.forEach(data => {{
+                setGrid.appendChild(data.element);
+            }});
+
+            // Update each card's content
+            setData.forEach(data => {{
+                const setCard = data.element;
+                const metrics = data.metrics;
+                const completionPercent = data.completionPercent;
+                const pendingPercent = data.pendingPercent;
+                const totalPercent = data.totalPercent;
 
                 // Update progress bar
                 const progressFill = setCard.querySelector('.progress-fill');
@@ -483,7 +518,7 @@ def generate_set_overview_page(all_cards):
                 }}
 
                 statsDiv.innerHTML = statsText;
-            }}
+            }});
         }}
 
         // Initialize on page load

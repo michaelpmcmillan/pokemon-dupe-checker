@@ -284,13 +284,13 @@ def extract_cardmarket_cards(html_content):
     # Updated pattern for new Cardmarket HTML structure
     # Look for full table rows containing td elements with card links in format "CardName (SET NUM)"
     # This captures both the card info AND the full row content for variant detection
-    row_pattern = r'<tr[^>]*>(.*?<td[^>]*class="(?:info|name[^"]*)"[^>]*>.*?<a[^>]*>([^<]*\([A-Z]+\s+\d+\))</a>.*?)</tr>'
+    row_pattern = r'<tr[^>]*>(.*?<td[^>]*class="(?:info|name[^"]*)"[^>]*>.*?<a[^>]*>([^<]*\([A-Z0-9]+\s+\d+\))</a>.*?)</tr>'
     row_matches = re.findall(row_pattern, html_content, re.IGNORECASE | re.DOTALL)
 
     for row_content, card_text in row_matches:
         # Parse the card text in format "CardName (SET NUM)"
         # Extract card name and the (SET NUM) pattern
-        card_match = re.match(r'^(.*?)\s*\(([A-Z]+)\s+(\d+)\)$', card_text.strip())
+        card_match = re.match(r'^(.*?)\s*\(([A-Z0-9]+)\s+(\d+)\)$', card_text.strip())
         if not card_match:
             continue
 
@@ -303,11 +303,10 @@ def extract_cardmarket_cards(html_content):
             continue
 
         # Determine variant type by looking for "Reverse Holo" in the row content
+        # Note: Regular "Holo" cards are part of the standard set, not a separate variant
         variant_type = 'Normal'
         if 'Reverse Holo' in row_content:
             variant_type = 'Reverse Holo'
-        elif 'Holo' in row_content and 'Reverse Holo' not in row_content:
-            variant_type = 'Holo'
 
         # Use set code as-is, no need for mapping
         set_name = f'Set {set_code}'
@@ -390,17 +389,11 @@ def extract_all_data():
     # Build set mapping
     set_mapping = build_set_mapping_from_tcg_cards(all_tcg_cards)
 
-    # Update Cardmarket cards with proper set names
+    # Update Cardmarket cards with proper set names from TCG Collector mapping
     for card in all_cm_cards:
         set_code = card.get('set_code')
-        set_name = card.get('set_name')
 
-        # Special handling for McDonald's sets - map different variations to the correct TCG set
-        if set_name and "McDonald's Dragon Discovery" in set_name:
-            # Map all McDonald's Dragon Discovery variations to the TCG version
-            card['set_code'] = 'M24'
-            card['set_name'] = "McDonald's Dragon Discovery 2024"
-        elif set_code and set_code in set_mapping:
+        if set_code and set_code in set_mapping:
             card['set_name'] = set_mapping[set_code]
 
     # Get source file information for change detection
